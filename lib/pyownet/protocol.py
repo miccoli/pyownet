@@ -3,7 +3,11 @@
 import struct
 import socket
 
-MAX_PAYLOAD = 1024*1024
+# socket buffer
+_SCK_BUF = 1024
+
+# do not attempt to read messages bigger than this
+MAX_PAYLOAD = _SCK_BUF
 
 # see msg_classification from ow_message.h
 MSG_ERROR = 0
@@ -17,17 +21,51 @@ MSG_GET = 8
 MSG_DIRALLSLASH = 9
 MSG_GETSLASH = 10
 
-FLG_OWNET = 0x00000100
-FLG_UNCACHED = 0x00000020
-FLG_SAFEMODE = 0x00000010
-FLG_ALIAS = 0x00000008
+# see http://owfs.org/index.php?page=owserver-flag-word
+# and ow_parsedname.h
+FLG_BUS_RET =     0x00000002
 FLG_PERSISTENCE = 0x00000004
-FLG_BUS_RET = 0x00000002
+FLG_ALIAS =       0x00000008
+FLG_SAFEMODE =    0x00000010
+FLG_UNCACHED =    0x00000020
+FLG_OWNET =       0x00000100
+
+# look for 
+# 'enum temp_type' in ow_temperature.h
+# 'enum pressure_type' in ow_pressure.h
+# 'enum deviceformat' in ow.h
+MSK_TEMPSCALE =     0x00030000
+MSK_PRESSURESCALE = 0x001C0000
+MSK_DEVFORMAT =     0xFF000000
+
+FLG_TEMP_C =        0x00000000
+FLG_TEMP_F =        0x00010000
+FLG_TEMP_K =        0x00020000
+FLG_TEMP_R =        0x00030000
+
+FLG_PRESS_MBAR =    0x00000000
+FLG_PRESS_ATM =     0x00040000
+FLG_PRESS_MMHG =    0x00080000
+FLG_PRESS_INHG =    0x000C0000
+FLG_PRESS_PSI =     0x00100000
+FLG_PRESS_PA =      0x00140000
+
+FLG_FORMAT_FDI =    0x00000000 #  /10.67C6697351FF
+FLG_FORMAT_FI =     0x01000000 #  /1067C6697351FF
+FLG_FORMAT_FDIDC =  0x02000000 #  /10.67C6697351FF.8D
+FLG_FORMAT_FDIC  =  0x03000000 #  /10.67C6697351FF8D
+FLG_FORMAT_FIDC =   0x04000000 #  /1067C6697351FF.8D
+FLG_FORMAT_FIC =    0x05000000 #  /1067C6697351FF8D
 
 
 class Error(Exception):
     pass
 
+
+class HostError(Error):
+
+    def __init__(self, reason):
+        self.reason = reason
 
 class ShortRead(Error):
     pass
@@ -95,7 +133,7 @@ class ServerHeader(_Header):
 
     __metaclass__ = _addfieldprops
     _fields = ('version', 'payload', 'type', 'flags', 'size', 'offset')
-    _defaults = (0, 0, MSG_NOP, FLG_OWNET, 1024, 0)
+    _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUF, 0)
 
 
 class ClientHeader(_Header):
@@ -106,24 +144,29 @@ class ClientHeader(_Header):
     _defaults = (0, 0, 0, FLG_OWNET, 0, 0)
 
 
-class OwnetClient(object):
+class OwnetClientConnection(object):
 
-    def __init__(self, hostport, verbose):
+    def __init__(self, sockaddr, verbose=False):
+        """establish a connection with server at sockaddr"""
         
         self.verbose = verbose
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect(hostport)
+        self.sock.connect(sockaddr)
+        self.sock.settimeout(1.0)
         if self.verbose:
             print self.sock.getsockname()
 
     def __del__(self):
 
-        self.sock.close()
+        pass
 
-    def session(self, header, payload):
-        """FIXME"""
+    def request(self, header, payload):
+        """
+        FIXME
+        """
         self.send_msg(header, payload)
         rep, data = self.read_msg()
+        self.sock.close()
         return rep, data
 
     def send_msg(self, header, payload):
@@ -148,6 +191,7 @@ class OwnetClient(object):
         header = self.sock.recv(ClientHeader.hsize)
         if len(header) < ClientHeader.hsize:
             raise ShortRead('Error reading ClientHeader, got %s' % repr(header))
+        assert(len(header) == ClientHeader.hsize)
         header = ClientHeader(header)
         if self.verbose: 
             print '<-', repr(header)
@@ -168,19 +212,26 @@ class OwnetClient(object):
     
 
 class OwnetProxy(object):
-    """proxy with owserver"""
+    """proxy owserver"""
 
     def __init__(self, host='localhost', port=4304, verbose=False):
-        self._hostport = (host, port)
+        try:
+            gai = socket.getaddrinfo(host, port, 
+                  socket.AF_INET, socket.SOCK_STREAM, socket.SOL_TCP)
+        except socket.gaierror as exp:
+            raise HostError(exp)
+        self._sockaddr = gai[0][4]
         self.verbose = verbose
-        # check connection
-        # FIXME
-        # without timeout this may hang!
-        assert self._session(ServerHeader(),'') == (ClientHeader(), '')
 
-    def _session(self, header, payload):
-        sess = OwnetClient(self._hostport, self.verbose)
-        return sess.session(header, payload)
+    def _send_request(self, header, payload):
+        sess = OwnetClientConnection(self._sockaddr, self.verbose)
+        return sess.request(header, payload)
+
+    def ping(self):
+        """check connection"""
+        resp, data =  self._send_request(ServerHeader(),'')
+        if (resp, data) != (ClientHeader(), ''):
+            raise DataError(repr(resp))
 
     def dir(self, path):
         """li = dir(path)"""
@@ -188,7 +239,7 @@ class OwnetProxy(object):
         path += '\x00'
         sheader = ServerHeader(payload=len(path), type=MSG_DIRALLSLASH)
         # chat
-        cheader, data = self._session(sheader, path)
+        cheader, data = self._send_request(sheader, path)
         # check reply
         if cheader.ret < 0:
             raise DataError(repr(cheader))
@@ -203,7 +254,7 @@ class OwnetProxy(object):
         path += '\x00'
         sheader = ServerHeader(payload=len(path), type=MSG_READ)
         # chat
-        cheader, data = self._session(sheader, path)
+        cheader, data = self._send_request(sheader, path)
         # chek reply
         if cheader.ret < 0:
             raise DataError(repr(cheader))
@@ -214,6 +265,7 @@ def test():
     proxy = OwnetProxy(verbose=True)
     proxy.dir('/')
     proxy.read('/26.B4FF64000000/temperature')
+    proxy.read('/26.52A664000000/temperature')
 
 if __name__ == '__main__':
     test()
