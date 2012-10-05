@@ -3,12 +3,6 @@
 import struct
 import socket
 
-# socket buffer
-_SCK_BUF = 1024
-
-# do not attempt to read messages bigger than this
-MAX_PAYLOAD = _SCK_BUF
-
 # see msg_classification from ow_message.h
 MSG_ERROR = 0
 MSG_NOP = 1
@@ -57,15 +51,22 @@ FLG_FORMAT_FDIC  =  0x03000000 #  /10.67C6697351FF8D
 FLG_FORMAT_FIDC =   0x04000000 #  /1067C6697351FF.8D
 FLG_FORMAT_FIC =    0x05000000 #  /1067C6697351FF8D
 
+# internal constants
+
+# socket buffer
+_SCK_BUFSIZ = 1024
+_SCK_TIMEOUT = 1.0
+# do not attempt to read messages bigger than this
+_MAX_PAYLOAD = _SCK_BUFSIZ
+
 
 class Error(Exception):
     pass
 
 
-class HostError(Error):
+class ConnError(Error):
+    pass
 
-    def __init__(self, reason):
-        self.reason = reason
 
 class ShortRead(Error):
     pass
@@ -75,8 +76,15 @@ class ShortWrite(Error):
     pass
 
 
-class DataError(Error):
+class ProtocolError(Error):
     pass
+
+
+class OwnetError(Error):
+
+    def __init__(self, errno=0, msg=''):
+        super(OwnetError, self).__init__(errno, msg)
+        self.errno = errno
 
 
 class _Header(str):
@@ -133,7 +141,7 @@ class ServerHeader(_Header):
 
     __metaclass__ = _addfieldprops
     _fields = ('version', 'payload', 'type', 'flags', 'size', 'offset')
-    _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUF, 0)
+    _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUFSIZ, 0)
 
 
 class ClientHeader(_Header):
@@ -146,60 +154,54 @@ class ClientHeader(_Header):
 
 class OwnetClientConnection(object):
 
-    def __init__(self, sockaddr, verbose=False):
-        """establish a connection with server at sockaddr"""
+    def __init__(self, sockaddr, family=socket.AF_INET, verbose=False):
+        "establish a connection with server at sockaddr"
         
         self.verbose = verbose
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect(sockaddr)
-        self.sock.settimeout(1.0)
+        self.socket = socket.socket(family, socket.SOCK_STREAM)
+        self.socket.settimeout(_SCK_TIMEOUT)
+        self.socket.connect(sockaddr)
         if self.verbose:
-            print self.sock.getsockname()
+            print self.socket.getsockname(), '->', self.socket.getpeername()
 
-    def __del__(self):
-
-        pass
+    def shutdown(self):
+        "shutdown connection"
+        self.socket.shutdown(socket.SHUT_RDWR)
+        self.socket.close()
 
     def request(self, header, payload):
-        """
-        FIXME
-        """
-        self.send_msg(header, payload)
-        rep, data = self.read_msg()
-        self.sock.close()
-        return rep, data
+        "send message to server and return response"
+        self._send_msg(header, payload)
+        return self._read_msg()
 
-    def send_msg(self, header, payload):
-        """
-        FIXME
-        """
-
+    def _send_msg(self, header, payload):
+        "send message to server"
         if self.verbose:
             print '->', repr(header)
             print '..', repr(payload)
         assert header.payload == len(payload)
-        sent = self.sock.send(header + payload)
+        sent = self.socket.send(header + payload)
         if sent < len(header + payload):
-            raise ShortWrite
+            raise ShortWrite()
         assert sent == len(header + payload), sent
         
-    def read_msg(self):
-        """
-        FIXME
-        """
-
-        header = self.sock.recv(ClientHeader.hsize)
+    def _read_msg(self):
+        "read message from server"
+        header = self.socket.recv(ClientHeader.hsize)
         if len(header) < ClientHeader.hsize:
             raise ShortRead('Error reading ClientHeader, got %s' % repr(header))
         assert(len(header) == ClientHeader.hsize)
         header = ClientHeader(header)
         if self.verbose: 
             print '<-', repr(header)
-        if header.version != 0 or header.payload > MAX_PAYLOAD:
-            raise DataError('got malformed header: %s "%s"' % 
+        if header.version != 0:
+            raise ProtocolError('got malformed header: %s "%s"' % 
+                                    (repr(header), header))
+        if header.payload > _MAX_PAYLOAD:
+            raise ProtocolError('huge data, unwilling to read: %s "%s"' %
                                     (repr(header), header))
         if header.payload > 0:
-            payload = self.sock.recv(header.payload)
+            payload = self.socket.recv(header.payload)
             if len(payload) < header.payload:
                 raise ShortRead('got %s' % repr(header)+':'+repr(payload))
             if self.verbose: 
@@ -209,32 +211,42 @@ class OwnetClientConnection(object):
         else:
             payload = ''
         return header, payload
-    
+
 
 class OwnetProxy(object):
     """proxy owserver"""
 
     def __init__(self, host='localhost', port=4304, verbose=False):
         try:
-            gai = socket.getaddrinfo(host, port, 
-                  socket.AF_INET, socket.SOCK_STREAM, socket.SOL_TCP)
+            gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
         except socket.gaierror as exp:
-            raise HostError(exp)
-        self._sockaddr = gai[0][4]
+            raise ConnError(exp)
+        for (family, _, _, _, sockaddr) in gai:
+            try:
+                conn = OwnetClientConnection(sockaddr, family, verbose)
+            except socket.error:
+                continue
+            else:
+                conn.shutdown()
+            self._sockaddr, self._family = sockaddr, family
+            break
+        else:
+            raise ConnError('unable to connect')
+        
         self.verbose = verbose
 
     def _send_request(self, header, payload):
-        sess = OwnetClientConnection(self._sockaddr, self.verbose)
-        return sess.request(header, payload)
+        conn = OwnetClientConnection(self._sockaddr, self._family, self.verbose)
+        return conn.request(header, payload)
 
     def ping(self):
-        """check connection"""
+        "check connection"
         resp, data =  self._send_request(ServerHeader(),'')
         if (resp, data) != (ClientHeader(), ''):
-            raise DataError(repr(resp))
+            raise OwnetError(-resp.ret)
 
     def dir(self, path):
-        """li = dir(path)"""
+        "li = dir(path)"
         # build message
         path += '\x00'
         sheader = ServerHeader(payload=len(path), type=MSG_DIRALLSLASH)
@@ -242,14 +254,14 @@ class OwnetProxy(object):
         cheader, data = self._send_request(sheader, path)
         # check reply
         if cheader.ret < 0:
-            raise DataError(repr(cheader))
+            raise OwnetError(-cheader.ret)
         if data:
             return data.split(',')
         else:
             return []
 
     def read(self, path):
-        """val = read(path)"""
+        "val = read(path)"
         # build message
         path += '\x00'
         sheader = ServerHeader(payload=len(path), type=MSG_READ)
@@ -257,15 +269,19 @@ class OwnetProxy(object):
         cheader, data = self._send_request(sheader, path)
         # chek reply
         if cheader.ret < 0:
-            raise DataError(repr(cheader))
+            raise OwnetError(-cheader.ret)
         return data
 
 
 def test():
-    proxy = OwnetProxy(verbose=True)
-    proxy.dir('/')
-    proxy.read('/26.B4FF64000000/temperature')
-    proxy.read('/26.52A664000000/temperature')
+    data = ('temperature', 'HIH3600/humidity', 'udate')
+    proxy = OwnetProxy(host='localhost', verbose=False)
+    sensors = proxy.dir('/')
+    for i in sensors:
+        print i,
+        for j in data:
+            print proxy.read(i+j),
+        print
 
 if __name__ == '__main__':
     test()
