@@ -1,5 +1,9 @@
 """this module is a first try to implement the ownet protocol"""
 
+__version__ = "$Revision$"
+__revision__ = "$Id$"
+# $URL$
+
 import struct
 import socket
 
