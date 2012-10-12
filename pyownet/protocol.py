@@ -64,11 +64,19 @@ _SCK_TIMEOUT = 1.0
 _MAX_PAYLOAD = _SCK_BUFSIZ
 
 
+#
+# exceptions
+# TODO: organize a better hierachy
+#
+
 class Error(Exception):
+    """Base class for all module errors"""
     pass
 
 
+# TODO: ConnError should be subclass of IOError
 class ConnError(Error):
+    """Connection failed"""
     pass
 
 
@@ -90,12 +98,34 @@ class OwnetError(Error):
         super(OwnetError, self).__init__(errno, msg)
         self.errno = errno
 
+#
+# classes
+#
+
+class _addfieldprops(type):
+    """metaclass for adding properties"""
+
+    @staticmethod
+    def _getter(i):
+        return lambda x: x._vals[i]
+
+    def __new__(mcs, name, bases, namespace):
+        for i, j in enumerate(namespace.get('_fields', (), )):
+            namespace[j] = property(mcs._getter(i))
+        return type.__new__(mcs, name, bases, namespace)
+
 
 class _Header(str):
     """base class for ownet protocol headers"""
 
+    __metaclass__ = _addfieldprops
+
     _format = struct.Struct(">iiiiii")
     hsize = _format.size
+
+    # TODO: find a way to not allow instatiating _Header() directly
+    _fields = ()
+    _defaults = ()
 
     def __new__(cls, *args, **kwargs):
         if args:
@@ -127,23 +157,9 @@ class _Header(str):
         return repr
 
 
-class _addfieldprops(type):
-    """metaclass for adding properties"""
-
-    @staticmethod
-    def _getter(i):
-        return lambda x: x._vals[i]
-
-    def __new__(mcs, name, bases, dict):
-        for i, j in enumerate(dict['_fields']):
-            dict[j] = property(mcs._getter(i))
-        return type.__new__(mcs, name, bases, dict)
-
-
 class ServerHeader(_Header):
     """client to server request header"""
 
-    __metaclass__ = _addfieldprops
     _fields = ('version', 'payload', 'type', 'flags', 'size', 'offset')
     _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUFSIZ, 0)
 
@@ -151,7 +167,6 @@ class ServerHeader(_Header):
 class ClientHeader(_Header):
     """server to client reply header"""
 
-    __metaclass__ = _addfieldprops
     _fields = ('version', 'payload', 'ret', 'flags', 'size', 'offset')
     _defaults = (0, 0, 0, FLG_OWNET, 0, 0)
 
@@ -240,8 +255,13 @@ class OwnetProxy(object):
         self.verbose = verbose
 
     def _send_request(self, header, payload):
-        conn = OwnetClientConnection(self._sockaddr, self._family, self.verbose)
-        return conn.request(header, payload)
+        try:
+            conn = OwnetClientConnection(self._sockaddr, self._family, 
+                       self.verbose)
+            rep = conn.request(header, payload)
+        except IOError as exp:
+            raise ConnError(exp)
+        return rep
 
     def ping(self):
         "check connection"
@@ -288,4 +308,5 @@ def test():
         print
 
 if __name__ == '__main__':
+    print __file__
     test()
