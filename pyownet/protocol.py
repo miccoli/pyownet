@@ -74,8 +74,7 @@ class Error(Exception):
     pass
 
 
-# TODO: ConnError should be subclass of IOError
-class ConnError(Error):
+class ConnError(Error, IOError):
     """Connection failed"""
     pass
 
@@ -110,9 +109,16 @@ class _addfieldprops(type):
         return lambda x: x._vals[i]
 
     def __new__(mcs, name, bases, namespace):
+        #TODO: check for name space clashes, sanity checks
         for i, j in enumerate(namespace.get('_fields', (), )):
             namespace[j] = property(mcs._getter(i))
-        return type.__new__(mcs, name, bases, namespace)
+        assert super(_addfieldprops, mcs).__new__ is type.__new__
+        return super(_addfieldprops, mcs).__new__(mcs, name, bases, namespace)
+
+    #def __call__(cls, *args, **kwargs):
+    #   print cls._fields
+    #   print args, kwargs
+    #   return super(_addfieldprops, cls).__call__(*args, **kwargs)
 
 
 class _Header(str):
@@ -239,18 +245,20 @@ class OwnetProxy(object):
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
         except socket.gaierror as exp:
-            raise ConnError(exp)
+            raise ConnError(*exp.args)
+        lastexp = None
         for (family, _, _, _, sockaddr) in gai:
             try:
                 conn = OwnetClientConnection(sockaddr, family, verbose)
-            except socket.error:
+            except socket.error as lastexp:
                 continue
             else:
                 conn.shutdown()
             self._sockaddr, self._family = sockaddr, family
             break
         else:
-            raise ConnError('unable to connect')
+            assert lastexp
+            raise ConnError(*lastexp.args)
         
         self.verbose = verbose
 
@@ -260,7 +268,7 @@ class OwnetProxy(object):
                        self.verbose)
             rep = conn.request(header, payload)
         except IOError as exp:
-            raise ConnError(exp)
+            raise ConnError(*exp.args)
         return rep
 
     def ping(self):
