@@ -91,11 +91,9 @@ class ProtocolError(Error):
     pass
 
 
-class OwnetError(Error):
+class OwnetError(Error, EnvironmentError):
+    pass
 
-    def __init__(self, errno=0, msg=''):
-        super(OwnetError, self).__init__(errno, msg)
-        self.errno = errno
 
 #
 # classes
@@ -121,8 +119,8 @@ class _addfieldprops(type):
     #   return super(_addfieldprops, cls).__call__(*args, **kwargs)
 
 
-class _Header(str):
-    """base class for ownet protocol headers"""
+class _HeaderT(object):
+    """template class for ownet protocol headers"""
 
     __metaclass__ = _addfieldprops
 
@@ -133,34 +131,52 @@ class _Header(str):
     _fields = ()
     _defaults = ()
 
-    def __new__(cls, *args, **kwargs):
+    @classmethod
+    def _parse(cls, *args, **kwargs):
         if args:
             msg = args[0]
             # FIXME check for args type and semantics
             assert len(args)==1
             assert not kwargs
-            assert isinstance(msg, str)
+            assert isinstance(msg, bytes)
             assert len(msg) == cls.hsize
             #
             vals = cls._format.unpack(msg)
         else:
             vals = tuple(map(kwargs.pop, cls._fields, cls._defaults))
             if kwargs:
-                print dir()
                 raise TypeError(
-  "__new__() got an unexpected keyword argument '%s'" % kwargs.popitem()[0] )
+  "constructor got unexpected keyword argument '%s'" % kwargs.popitem()[0] )
             msg = cls._format.pack(*vals)
-        self = super(_Header, cls).__new__(cls, msg)
+        assert isinstance(msg, bytes)
         assert isinstance(vals, tuple)
-        self._vals = vals
-        return self
+        return msg, vals
 
     def __repr__(self):
         repr = self.__class__.__name__ + '('
-        repr += ', '.join(map(lambda x: '%s=%s' % x, 
-                            zip(self._fields, self._vals)))
+        repr += ', '.join('%s=%s' % x for x in zip(self._fields, self._vals))
         repr += ')'
         return repr
+
+
+class _Header(_HeaderT, str):
+
+    def __new__(cls, *args, **kwargs):
+ 
+        msg, vals = cls._parse(*args, **kwargs)
+        assert super(_Header, cls).__new__ is str.__new__
+        self = super(_Header, cls).__new__(cls, msg)
+        self._vals = vals
+        return self
+
+
+class _HeaderM(_HeaderT, bytearray):
+
+    def __init__(self, *args, **kwargs):
+        
+        msg, vals = self._parse(*args, **kwargs)
+        super(_HeaderM, self).__init__(msg)
+        self._vals = vals
 
 
 class ServerHeader(_Header):
@@ -257,7 +273,8 @@ class OwnetProxy(object):
             self._sockaddr, self._family = sockaddr, family
             break
         else:
-            assert lastexp
+            assert isinstance(lastexp, socket.error)
+            assert isinstance(lastexp, IOError)
             raise ConnError(*lastexp.args)
         
         self.verbose = verbose
@@ -267,6 +284,7 @@ class OwnetProxy(object):
             conn = OwnetClientConnection(self._sockaddr, self._family, 
                        self.verbose)
             rep = conn.request(header, payload)
+            conn.shutdown()
         except IOError as exp:
             raise ConnError(*exp.args)
         return rep
@@ -275,7 +293,7 @@ class OwnetProxy(object):
         "check connection"
         resp, data =  self._send_request(ServerHeader(),'')
         if (resp, data) != (ClientHeader(), ''):
-            raise OwnetError(-resp.ret)
+            raise OwnetError(-resp.ret, '')
 
     def dir(self, path):
         "li = dir(path)"
@@ -286,7 +304,7 @@ class OwnetProxy(object):
         cheader, data = self._send_request(sheader, path)
         # check reply
         if cheader.ret < 0:
-            raise OwnetError(-cheader.ret)
+            raise OwnetError(-cheader.ret, '')
         if data:
             return data.split(',')
         else:
@@ -301,7 +319,7 @@ class OwnetProxy(object):
         cheader, data = self._send_request(sheader, path)
         # chek reply
         if cheader.ret < 0:
-            raise OwnetError(-cheader.ret)
+            raise OwnetError(-cheader.ret, '')
         return data
 
 
