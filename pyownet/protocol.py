@@ -257,7 +257,8 @@ class OwnetClientConnection(object):
 class OwnetProxy(object):
     """proxy owserver"""
 
-    def __init__(self, host='localhost', port=4304, verbose=False):
+    def __init__(self, host='localhost', port=4304, flags=0, 
+                 verbose=False, ):
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
         except socket.gaierror as exp:
@@ -278,6 +279,7 @@ class OwnetProxy(object):
             raise ConnError(*lastexp.args)
         
         self.verbose = verbose
+        self.flags = flags
 
     def _send_request(self, header, payload):
         try:
@@ -295,16 +297,31 @@ class OwnetProxy(object):
         if (resp, data) != (ClientHeader(), ''):
             raise OwnetError(-resp.ret, '')
 
-    def dir(self, path):
+    def present(self, path):
+        "check presence of sensor"
+        path += '\x00'
+        sheader = ServerHeader(payload=len(path), type=MSG_PRESENCE, 
+            flags=self.flags, )
+        cheader, data = self._send_request(sheader, path)
+        assert len(data) == 0
+        if cheader.ret < 0:
+            return False
+        else:
+            assert cheader.ret == 0
+            return True
+        
+
+    def dir(self, path, slash=True, bus=False):
         "li = dir(path)"
         # build message
         path += '\x00'
-        sheader = ServerHeader(payload=len(path), type=MSG_DIRALLSLASH)
+        sheader = ServerHeader(payload=len(path), type=MSG_DIRALLSLASH,
+            flags=self.flags, )
         # chat
         cheader, data = self._send_request(sheader, path)
         # check reply
         if cheader.ret < 0:
-            raise OwnetError(-cheader.ret, '')
+            raise OwnetError(-cheader.ret, '', path[:-1])
         if data:
             return data.split(',')
         else:
@@ -314,12 +331,13 @@ class OwnetProxy(object):
         "val = read(path)"
         # build message
         path += '\x00'
-        sheader = ServerHeader(payload=len(path), type=MSG_READ)
+        sheader = ServerHeader(payload=len(path), type=MSG_READ, 
+            flags=self.flags, )
         # chat
         cheader, data = self._send_request(sheader, path)
         # chek reply
         if cheader.ret < 0:
-            raise OwnetError(-cheader.ret, '')
+            raise OwnetError(-cheader.ret, '', path[:-1])
         return data
 
 
