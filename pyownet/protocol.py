@@ -175,14 +175,14 @@ class _HeaderM(_HeaderT, bytearray):
         self._vals = vals
 
 
-class ServerHeader(_Header):
+class _ServerHeader(_Header):
     """client to server request header"""
 
     _fields = ('version', 'payload', 'type', 'flags', 'size', 'offset')
     _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUFSIZ, 0)
 
 
-class ClientHeader(_Header):
+class _ClientHeader(_Header):
     """server to client reply header"""
 
     _fields = ('version', 'payload', 'ret', 'flags', 'size', 'offset')
@@ -206,10 +206,15 @@ class OwnetClientConnection(object):
         self.socket.shutdown(socket.SHUT_RDWR)
         self.socket.close()
 
-    def request(self, header, payload):
+    def req(self, type, payload, flags, ):
         "send message to server and return response"
-        self._send_msg(header, payload)
-        return self._read_msg()
+
+        payload += '\x00'
+        shead = _ServerHeader(payload=len(payload), type=type, flags=flags, )
+        self._send_msg(shead, payload)
+        chead, data = self._read_msg()
+        assert chead.flags == shead.flags
+        return chead.ret, data
 
     def _send_msg(self, header, payload):
         "send message to server"
@@ -224,11 +229,11 @@ class OwnetClientConnection(object):
         
     def _read_msg(self):
         "read message from server"
-        header = self.socket.recv(ClientHeader.hsize)
-        if len(header) < ClientHeader.hsize:
+        header = self.socket.recv(_ClientHeader.hsize)
+        if len(header) < _ClientHeader.hsize:
             raise ShortRead('Error reading ClientHeader, got %s' % repr(header))
-        assert(len(header) == ClientHeader.hsize)
-        header = ClientHeader(header)
+        assert(len(header) == _ClientHeader.hsize)
+        header = _ClientHeader(header)
         if self.verbose: 
             print '<-', repr(header)
         if header.version != 0:
@@ -253,7 +258,7 @@ class OwnetClientConnection(object):
 class OwnetProxy(object):
     """proxy owserver"""
 
-    def __init__(self, host='localhost', port=4304, flags=0, 
+    def __init__(self, host='localhost', port=4304, flags=FLG_OWNET, 
                  verbose=False, ):
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
@@ -277,76 +282,76 @@ class OwnetProxy(object):
         self.verbose = verbose
         self.flags = flags
 
-    def _send_request(self, header, payload):
+    def sendmess(self, type, payload, flags=None, ):
+        "send generic message"
+
+        if flags is None:
+            flags = self.flags
+
         try:
             conn = OwnetClientConnection(self._sockaddr, self._family, 
                        self.verbose)
-            rep = conn.request(header, payload)
+            ret, data = conn.req(type, payload, flags)
             conn.shutdown()
         except IOError as exp:
             raise ConnError(*exp.args)
-        return rep
+
+        return ret, data
 
     def ping(self):
         "check connection"
-        resp, data =  self._send_request(ServerHeader(),'')
-        if (resp, data) != (ClientHeader(), ''):
-            raise OwnetError(-resp.ret, '')
+        ret, data =  self.sendmess(MSG_NOP, '')
+        if (ret, data) != (0, ''):
+            raise OwnetError(-ret, '')
 
     def present(self, path):
         "check presence of sensor"
-        path += '\x00'
-        sheader = ServerHeader(payload=len(path), type=MSG_PRESENCE, 
-            flags=self.flags, )
-        cheader, data = self._send_request(sheader, path)
+
+        ret, data = self.sendmess(MSG_PRESENCE, path)
+        assert ret <= 0
         assert len(data) == 0
-        if cheader.ret < 0:
+        if ret < 0:
             return False
         else:
-            assert cheader.ret == 0
             return True
-        
 
     def dir(self, path, slash=True, bus=False):
-        "li = dir(path)"
-        # build message
-        path += '\x00'
-        sheader = ServerHeader(payload=len(path), type=MSG_DIRALLSLASH,
-            flags=self.flags, )
-        # chat
-        cheader, data = self._send_request(sheader, path)
-        # check reply
-        if cheader.ret < 0:
-            raise OwnetError(-cheader.ret, '', path[:-1])
+        "list entities at path"
+
+        if slash:
+            msg = MSG_DIRALLSLASH
+        else:
+            msg = MSG_DIRALL
+        if bus:
+            flags = self.flags | FLG_BUS_RET
+        else:
+            flags = self.flags & ~FLG_BUS_RET
+
+        ret, data = self.sendmess(msg, path, flags)
+        if ret < 0:
+            raise OwnetError(-ret, '', path)
         if data:
             return data.split(',')
         else:
             return []
 
     def read(self, path):
-        "val = read(path)"
-        # build message
-        path += '\x00'
-        sheader = ServerHeader(payload=len(path), type=MSG_READ, 
-            flags=self.flags, )
-        # chat
-        cheader, data = self._send_request(sheader, path)
-        # chek reply
-        if cheader.ret < 0:
-            raise OwnetError(-cheader.ret, '', path[:-1])
+        "read data at path"
+
+        ret, data = self.sendmess(MSG_READ, path)
+        if ret < 0:
+            raise OwnetError(-ret, '', path)
         return data
 
-
 def test():
-    data = ('temperature', 'HIH3600/humidity', 'udate')
-    proxy = OwnetProxy(host='localhost', verbose=False)
-    sensors = proxy.dir('/')
+    proxy = OwnetProxy(verbose=False)
+    proxy.ping()
+    assert not proxy.present('/nonexistent')
+    sensors = proxy.dir('/',bus=False)
     for i in sensors:
-        print i,
-        for j in data:
-            print proxy.read(i+j),
-        print
+        assert proxy.present(i)
+        stype = proxy.read(i + 'type')
+        print i, stype
 
 if __name__ == '__main__':
-    print __file__
     test()
