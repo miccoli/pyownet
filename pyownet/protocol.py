@@ -55,7 +55,7 @@ FLG_FORMAT_FIC =    0x05000000 #  /1067C6697351FF8D
 
 # socket buffer
 _SCK_BUFSIZ = 1024
-_SCK_TIMEOUT = 1.0
+_SCK_TIMEOUT = 2.0
 # do not attempt to read messages bigger than this
 _MAX_PAYLOAD = _SCK_BUFSIZ
 
@@ -179,7 +179,7 @@ class _ServerHeader(_Header):
     """client to server request header"""
 
     _fields = ('version', 'payload', 'type', 'flags', 'size', 'offset')
-    _defaults = (0, 0, MSG_NOP, FLG_OWNET, _SCK_BUFSIZ, 0)
+    _defaults = (0, 0, MSG_NOP, FLG_OWNET, 0, 0)
 
 
 class _ClientHeader(_Header):
@@ -206,11 +206,11 @@ class OwnetClientConnection(object):
         self.socket.shutdown(socket.SHUT_RDWR)
         self.socket.close()
 
-    def req(self, type, payload, flags, ):
+    def req(self, type, payload, flags, size=0, offset=0):
         "send message to server and return response"
 
-        payload += '\x00'
-        shead = _ServerHeader(payload=len(payload), type=type, flags=flags, )
+        shead = _ServerHeader(payload=len(payload), type=type, flags=flags, 
+            size=size, offset=offset)
         self._send_msg(shead, payload)
         chead, data = self._read_msg()
         assert chead.flags == shead.flags
@@ -282,7 +282,7 @@ class OwnetProxy(object):
         self.verbose = verbose
         self.flags = flags
 
-    def sendmess(self, type, payload, flags=None, ):
+    def sendmess(self, type, payload, flags=None, size=0, offset=0):
         "send generic message"
 
         if flags is None:
@@ -291,7 +291,7 @@ class OwnetProxy(object):
         try:
             conn = OwnetClientConnection(self._sockaddr, self._family, 
                        self.verbose)
-            ret, data = conn.req(type, payload, flags)
+            ret, data = conn.req(type, payload, flags, size, offset)
             conn.shutdown()
         except IOError as exp:
             raise ConnError(*exp.args)
@@ -307,6 +307,7 @@ class OwnetProxy(object):
     def present(self, path):
         "check presence of sensor"
 
+        path += '\x00'
         ret, data = self.sendmess(MSG_PRESENCE, path)
         assert ret <= 0
         assert len(data) == 0
@@ -315,9 +316,10 @@ class OwnetProxy(object):
         else:
             return True
 
-    def dir(self, path, slash=True, bus=False):
+    def dir(self, path='/', slash=True, bus=False):
         "list entities at path"
 
+        path += '\x00'
         if slash:
             msg = MSG_DIRALLSLASH
         else:
@@ -335,13 +337,27 @@ class OwnetProxy(object):
         else:
             return []
 
-    def read(self, path):
+    def read(self, path, size=_MAX_PAYLOAD):
         "read data at path"
 
-        ret, data = self.sendmess(MSG_READ, path)
+        # FIXME!
+        if size > _MAX_PAYLOAD:
+            raise ValueError("size cannot exceed < %d" % _MAX_PAYLOAD)
+
+        path += '\x00'
+        ret, data = self.sendmess(MSG_READ, path, size=size)
         if ret < 0:
-            raise OwnetError(-ret, '', path)
+            raise OwnetError(-ret, '', path[:-1])
         return data
+
+    def write(self, path, data):
+        "write data at path"
+
+        path += '\x00'
+        ret, rdata = self.sendmess(MSG_WRITE, path+data, size=len(data))
+        assert len(rdata) == 0
+        if ret < 0:
+            raise OwnetError(-ret, '', path[:-1])
 
 def test():
     proxy = OwnetProxy(verbose=False)
