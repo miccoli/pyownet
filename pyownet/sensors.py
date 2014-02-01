@@ -1,28 +1,30 @@
 # sensors
 
+from __future__ import print_function
+
 import posixpath
+import types
 
 from pyownet import protocol
 
-_TYPE_CODE = dict(i=int, u=int, f=float, l=str, a=str, b=bytearray, y=bool, 
+_TYPE_CODE = dict(i=int, u=int, f=float, l=str, a=str, b=bytes, y=bool, 
     d=str, t=float, g=float, p=float)
 
 
 class metasensor(type):
 
     def __new__(mcs, name, bases, namespace):
-        #TODO: check for name space clashes, sanity checks
         for key, val in namespace.iteritems():
             if isinstance(val, dict):
                 namespace[key] = metasensor('subdir', bases, val)()
-        assert super(metasensor, mcs).__new__ is type.__new__
         return super(metasensor, mcs).__new__(mcs, name, bases, namespace)
 
 
-class _mixsensor(object):
+class _sensor(object):
 
     def __str__(self):
         return "%s at %s" % (self.type, self.address)
+
 
 class Properties(object):
     
@@ -60,7 +62,7 @@ def _parse_structure(proxy, family):
                 namespace[i[pre:-1]] = walk(i)
             else:
                 namespace[i[pre:]] = Properties(proxy.read(i))
-                #print i.ljust(35), Properties(proxy.read(i))
+                #print(i.ljust(35), Properties(proxy.read(i)))
         return namespace
 
     path = '/structure/%s/' % family
@@ -71,10 +73,10 @@ def _sens_namespace(proxy, entity):
 
     def getter(path, name, val):
         cast = _TYPE_CODE[val.type]
-        def read():
-            return cast(proxy.read(path))
+        read = lambda: cast(proxy.read(path))
         read.__doc__ = "returns %s as %s" % (path, cast)
-        read.__name__ = name
+        # fixme: str(name) is because in python 2 unicode is distinct form str
+        read.__name__ = str(name)
         return read
 
     def walk(path,stru):
@@ -98,20 +100,35 @@ def _sens_namespace(proxy, entity):
 
     assert proxy.present(entity)
     assert proxy.present(posixpath.join(entity, 'family'))
-    fam = proxy.read(posixpath.join(entity, 'family'))
+    fam = proxy.read(posixpath.join(entity, 'family')).decode()
     stru = _parse_structure(proxy, fam)
-    namespace = walk(entity,stru) 
+    namespace = walk(entity, stru) 
     return namespace
 
 def getsensor(proxy, path):
 
     ns = _sens_namespace(proxy, path)
-    return metasensor(ns['type'], (_mixsensor, object), ns)()
+    return metasensor(ns['type'], (_sensor, object), ns)()
 
 def _test():
+    def walk(prefix, s):
+        for att in dir(s):
+            fatt = getattr(s, att, None)
+            if isinstance(fatt, types.FunctionType):
+                try:
+                    print(prefix, att.ljust(12), fatt())
+                except protocol.OwnetError as exp:
+                    print(prefix, att.ljust(12), exp)
+            elif isinstance(fatt, str) and not fatt.startswith('__'):
+                print(prefix, att.ljust(12), fatt)
+            elif isinstance(fatt, _sensor):
+                print(prefix, att.ljust(12))
+                walk('    ' + prefix, fatt)
     proxy = protocol.OwnetProxy()
     for i in proxy.dir():
-        print getsensor(proxy, i)
+        s = getsensor(proxy, i)
+        print(s)
+        walk('|--', s)
 
 if __name__ == '__main__':
     _test()
