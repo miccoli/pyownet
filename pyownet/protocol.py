@@ -14,7 +14,9 @@ commands.
 True
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
->>> owproxy.write('/10.67C6697351FF/alias', 'sensA')
+>>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
+>>> owproxy.dir()
+['/sensA/', '/05.4AEC29CDBAAB/']
 
 The lowlevel OwnetConnection encapsulates all socket operations and 
 interactions with the server.
@@ -285,7 +287,9 @@ class OwnetProxy(object):
     def __init__(self, host='localhost', port=4304, flags=0, 
                  verbose=False, ):
         """return an ownet proxy object bound at (host, port); default is
-        (localhost, 4304). 'flags' are or-ed in the headr of each query.
+        (localhost, 4304). 
+
+        'flags' are or-ed in the header of each query sent to owserver.
         If verbose is True, details on each sent and received packed is 
         printed on stdout.
         """ 
@@ -319,7 +323,7 @@ class OwnetProxy(object):
         self._sockaddr, self._family = sockaddr, family
 
         self.verbose = verbose
-        self.flags = flags
+        self.flags = flags | FLG_OWNET
 
         # check if owserver on the line
         self.ping()
@@ -396,9 +400,13 @@ class OwnetProxy(object):
         return data
 
     def write(self, path, data):
-        "write data at path"
+        """write data at path
 
-        assert isinstance(bytes, data)
+        path is a string, data binary; it is responsability of the caller
+        ensure proper encoding.
+        """
+
+        assert isinstance(data, bytes)
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data, 
             size=len(data))
         assert len(rdata) == 0
