@@ -1,6 +1,6 @@
 # pyownet, a pythonic interface to ownet
 
-pyownet is a pure python library that interfaces to an 
+pyownet is a pure python package that allows to access an 
 [owserver](http://owfs.org/index.php?page=owserver_protocol) via the 
 [owserver network protocol](http://owfs.org/index.php?page=owserver-protocol),
 in short _ownet_.
@@ -12,11 +12,9 @@ owserver is part of the [OWFS 1-Wire File System](http://owfs.org):
 > environment. You can write scripts to read temperature, flash lights, write
 > to an LCD, log and graph, ...
 
-This package is composed by modules.
-
-`pyownet.protocol` implements low-level intereaction via the owserver protocol.
-A proxy object is created, with methods corresponding to the possible ownet 
-messages:
+The `pyownet.protocol` module is a low-level implementation of the ownet
+protocol. Interaction with an owserver takes place via a proxy object whose
+methods correspond to ownet messages:
 
 ```
 >>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
