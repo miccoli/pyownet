@@ -1,7 +1,14 @@
+from pyownet import __version__
+
 from distutils.core import setup
+try:
+    from distutils.command.build_py import build_py_2to3 as build_py
+except ImportError:
+    # 2.x
+    from distutils.command.build_py import build_py
 
 setup(name = 'pyownet',
-      version = '0.6.2.dev0',
+      version = __version__,
       packages = ['pyownet', ],
       description = 'python ownet client library',
       author = 'Stefano Miccoli',
@@ -12,5 +19,6 @@ setup(name = 'pyownet',
           'Environment :: Other Environment',
           'Intended Audience :: Developers',
           'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-          ]
+          ],
+      cmdclass = {'build_py':build_py}
      )

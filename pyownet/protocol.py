@@ -170,8 +170,8 @@ class _addfieldprops(type):
             if __debug__:
                 try:
                     namespace['_struct'].pack(*namespace['_defaults'])
-                except struct.error as exp:
-                    raise AssertionError('Unable to pack _defaults: %s' % exp)
+                except struct.error as err:
+                    raise AssertionError('Unable to pack _defaults: %s' % err)
 
         return super(_addfieldprops, mcs).__new__(mcs, name, bases, namespace)
 
@@ -319,25 +319,25 @@ class OwnetProxy(object):
         # resolve host name/port
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
-        except socket.gaierror as exp:
-            raise ConnError(*exp.args)
+        except socket.gaierror as err:
+            raise ConnError(*err.args)
 
         # gai is a list of tuples, search for the first working one
-        lastexp = None
+        lasterr = None
         for (family, _, _, _, sockaddr) in gai:
             try:
                 conn = OwnetConnection(sockaddr, family, verbose)
-            except socket.error as lastexp:
+            except socket.error as err:
                 # not working, go over to next sockaddr
-                continue
+                lasterr = err
             else:
                 # ok, this is working, stop searching
                 break
         else:
             # no working (sockaddr, family) found: raise error
-            assert isinstance(lastexp, socket.error)
-            assert isinstance(lastexp, IOError)
-            raise ConnError(*lastexp.args)
+            assert isinstance(lasterr, socket.error)
+            assert isinstance(lasterr, IOError)
+            raise ConnError(*lasterr.args)
         
         # here we have an open connection, close for now
         conn.shutdown()
@@ -369,8 +369,8 @@ class OwnetProxy(object):
                        self.verbose)
             ret, _, data = conn.req(type, payload, flags, size, offset)
             conn.shutdown()
-        except IOError as exp:
-            raise ConnError(*exp.args)
+        except IOError as err:
+            raise ConnError(*err.args)
 
         return ret, data
 
@@ -446,7 +446,7 @@ def _main():
     print("owserver directory on localhost:")
     print("id".center(17), "type".center(7))
     for sensor in proxy.dir(slash=False, bus=False):
-        stype = proxy.read(sensor + '/type')
+        stype = bytes2str(proxy.read(sensor + '/type'))
         print(sensor.ljust(17), stype.ljust(7))
     return 0
 
