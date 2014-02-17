@@ -1,10 +1,10 @@
 """ownet protocol implementation
 
-This module provides classes to query an owserver via the ownet protocol. 
-It is a pure python implementation, with no external dependencies.
+This module is a pure python, low level implementation of the ownet 
+protocol.
 
-A proxy object is provided that implements methods for the protocol 
-commands.
+OwnetProxy instances are proxy objects whose methods correspond to ownet 
+protocol messages.
 
 >>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
 >>> owproxy.ping()
@@ -14,18 +14,37 @@ commands.
 True
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
->>> owproxy.write('/10.67C6697351FF/alias', 'sensA')
+>>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
+>>> owproxy.dir()
+['/sensA/', '/05.4AEC29CDBAAB/']
 
-The lowlevel OwnetConnection encapsulates all socket operations and 
-interactions with the server.
+The OwnetConnection class encapsulates all socket operations and 
+interactions with the server and is mean for internal use.
 
 """
+
+#
+# Copyright 2013, 2014 Stefano Miccoli
+#
+# This python package is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 
 from __future__ import print_function
 
 import struct
 import socket
-import collections
+#import collections
 
 # see msg_classification from ow_message.h
 MSG_ERROR = 0
@@ -84,12 +103,17 @@ _MAX_PAYLOAD = 65536
 
 def str2bytez(s):
     "transform string to zero-terminated bytes"
-    return s.encode() + b'\x00'
+    return s.encode('ascii') + b'\x00'
 
-class _dummy(collections.Sequence):
-    # dummy list, every item is an empty string
-    __len__ = lambda self: 0
-    __getitem__ = lambda self, i: ''
+def bytes2str(b):
+    "transform bytes to string"
+    return b.decode('ascii')
+
+
+#class _dummy(collections.Sequence):
+#    # dummy list, every item is an empty string
+#    __len__ = lambda self: 0
+#    __getitem__ = lambda self, i: ''
 
 #
 # exceptions
@@ -146,8 +170,8 @@ class _addfieldprops(type):
             if __debug__:
                 try:
                     namespace['_struct'].pack(*namespace['_defaults'])
-                except struct.error as exp:
-                    raise AssertionError('Unable to pack _defaults: %s' % exp)
+                except struct.error as err:
+                    raise AssertionError('Unable to pack _defaults: %s' % err)
 
         return super(_addfieldprops, mcs).__new__(mcs, name, bases, namespace)
 
@@ -285,7 +309,9 @@ class OwnetProxy(object):
     def __init__(self, host='localhost', port=4304, flags=0, 
                  verbose=False, ):
         """return an ownet proxy object bound at (host, port); default is
-        (localhost, 4304). 'flags' are or-ed in the headr of each query.
+        (localhost, 4304). 
+
+        'flags' are or-ed in the header of each query sent to owserver.
         If verbose is True, details on each sent and received packed is 
         printed on stdout.
         """ 
@@ -293,25 +319,25 @@ class OwnetProxy(object):
         # resolve host name/port
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
-        except socket.gaierror as exp:
-            raise ConnError(*exp.args)
+        except socket.gaierror as err:
+            raise ConnError(*err.args)
 
         # gai is a list of tuples, search for the first working one
-        lastexp = None
+        lasterr = None
         for (family, _, _, _, sockaddr) in gai:
             try:
                 conn = OwnetConnection(sockaddr, family, verbose)
-            except socket.error as lastexp:
+            except socket.error as err:
                 # not working, go over to next sockaddr
-                continue
+                lasterr = err
             else:
                 # ok, this is working, stop searching
                 break
         else:
             # no working (sockaddr, family) found: raise error
-            assert isinstance(lastexp, socket.error)
-            assert isinstance(lastexp, IOError)
-            raise ConnError(*lastexp.args)
+            assert isinstance(lasterr, socket.error)
+            assert isinstance(lasterr, IOError)
+            raise ConnError(*lasterr.args)
         
         # here we have an open connection, close for now
         conn.shutdown()
@@ -319,16 +345,17 @@ class OwnetProxy(object):
         self._sockaddr, self._family = sockaddr, family
 
         self.verbose = verbose
-        self.flags = flags
+        self.flags = flags | FLG_OWNET
 
         # check if owserver on the line
         self.ping()
 
         #self.errmess = _dummy()
+
         # fetch errcodes array from owserver
         errcodes = '/settings/return_codes/text.ALL'
         assert self.present(errcodes)
-        self.errmess = self.read(errcodes).decode().split(',')
+        self.errmess = bytes2str(self.read(errcodes)).split(',')
 
     def sendmess(self, type, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(type, payload)
@@ -342,8 +369,8 @@ class OwnetProxy(object):
                        self.verbose)
             ret, _, data = conn.req(type, payload, flags, size, offset)
             conn.shutdown()
-        except IOError as exp:
-            raise ConnError(*exp.args)
+        except IOError as err:
+            raise ConnError(*err.args)
 
         return ret, data
 
@@ -354,7 +381,7 @@ class OwnetProxy(object):
             raise OwnetError(-ret, self.errmess[-ret])
 
     def present(self, path):
-        "returns True if there is an entity as path"
+        "returns True if there is an entity at path"
 
         ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
         assert ret <= 0
@@ -380,7 +407,7 @@ class OwnetProxy(object):
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         if data:
-            return data.decode().split(',')
+            return bytes2str(data).split(',')
         else:
             return []
 
@@ -396,28 +423,32 @@ class OwnetProxy(object):
         return data
 
     def write(self, path, data):
-        "write data at path"
+        """write data at path
 
-        assert isinstance(bytes, data)
+        path is a string, data binary; it is responsability of the caller
+        ensure proper encoding.
+        """
+
+        assert isinstance(data, bytes)
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data, 
             size=len(data))
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
 
-def _test():
-    proxy = OwnetProxy()
-    proxy.ping()
-    assert not proxy.present('/nonexistent')
-    sensors = proxy.dir('/',bus=False)
-    for j,i in enumerate(sensors):
-        assert proxy.present(i), i
-        stype = proxy.read(i + 'type')
-        if proxy.present(i + 'temperature'):
-            temp = proxy.read(i + 'temperature')
-        else:
-            temp = ''
-        print(i, stype, temp)
+def _main():
+    # print sensors on localhost owserver
+    try:
+        proxy = OwnetProxy()
+    except ConnError:
+        print("No owserver on localhost")
+        return 1
+    print("owserver directory on localhost:")
+    print("id".center(17), "type".center(7))
+    for sensor in proxy.dir(slash=False, bus=False):
+        stype = bytes2str(proxy.read(sensor + '/type'))
+        print(sensor.ljust(17), stype.ljust(7))
+    return 0
 
 if __name__ == '__main__':
-    _test()
+    _main()
