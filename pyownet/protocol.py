@@ -19,7 +19,7 @@ True
 ['/sensA/', '/05.4AEC29CDBAAB/']
 
 The OwnetConnection class encapsulates all socket operations and 
-interactions with the server and is mean for internal use.
+interactions with the server and is meant for internal use.
 
 """
 
@@ -44,7 +44,6 @@ from __future__ import print_function
 
 import struct
 import socket
-#import collections
 
 # see msg_classification from ow_message.h
 MSG_ERROR = 0
@@ -103,17 +102,16 @@ _MAX_PAYLOAD = 65536
 
 def str2bytez(s):
     "transform string to zero-terminated bytes"
+    if not isinstance(s, basestring):
+        raise TypeError()
     return s.encode('ascii') + b'\x00'
 
 def bytes2str(b):
     "transform bytes to string"
+    if not isinstance(b, bytes):
+        raise TypeError()
     return b.decode('ascii')
 
-
-#class _dummy(collections.Sequence):
-#    # dummy list, every item is an empty string
-#    __len__ = lambda self: 0
-#    __getitem__ = lambda self, i: ''
 
 #
 # exceptions
@@ -148,6 +146,15 @@ class OwnetError(Error, EnvironmentError):
 #
 # classes
 #
+
+class _errtuple(tuple):
+    
+    def __getitem__(self, i):
+        try:
+            return super(_errtuple, self).__getitem__(i)
+        except IndexError:
+            return '(unkown error)'
+
 
 class _addfieldprops(type):
     """metaclass for adding properties"""
@@ -312,7 +319,7 @@ class OwnetProxy(object):
         (localhost, 4304). 
 
         'flags' are or-ed in the header of each query sent to owserver.
-        If verbose is True, details on each sent and received packed is 
+        If verbose is True, details on each sent and received packet is 
         printed on stdout.
         """ 
 
@@ -343,6 +350,7 @@ class OwnetProxy(object):
         conn.shutdown()
 
         self._sockaddr, self._family = sockaddr, family
+        self._hostport = (host, port) # for display only
 
         self.verbose = verbose
         self.flags = flags | FLG_OWNET
@@ -355,7 +363,11 @@ class OwnetProxy(object):
         # fetch errcodes array from owserver
         errcodes = '/settings/return_codes/text.ALL'
         assert self.present(errcodes)
-        self.errmess = bytes2str(self.read(errcodes)).split(',')
+        self.errmess = _errtuple(
+            m for m in bytes2str(self.read(errcodes)).split(','))
+
+    def __str__(self):
+        return "ownet server at %s" % (self._hostport, )
 
     def sendmess(self, type, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(type, payload)
@@ -443,7 +455,7 @@ def _main():
     except ConnError:
         print("No owserver on localhost")
         return 1
-    print("owserver directory on localhost:")
+    print("directory on %s:" % proxy)
     print("id".center(17), "type".center(7))
     for sensor in proxy.dir(slash=False, bus=False):
         stype = bytes2str(proxy.read(sensor + '/type'))
