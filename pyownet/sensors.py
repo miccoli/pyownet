@@ -19,7 +19,6 @@
 
 from __future__ import print_function
 
-import posixpath
 import types
 import re
 
@@ -48,8 +47,9 @@ class Properties(object):
     
     def __init__(self, record):
 
-        if not isinstance(record, str):
-            raise TypeError('record must be a string')
+        if not isinstance(record, bytes):
+            raise TypeError('record must be bytes')
+        record = record.decode()
         flds = record.split(',')
         if len(flds) < 7:
             raise ValueError('invalid record')
@@ -67,17 +67,18 @@ class Properties(object):
 
 def _pathname_mangle(path):
     path = path.replace('-', '_')
-    path = path.replace('.ALL', '')
+    for suffix in ('.ALL', '/', ):
+        if path.endswith(suffix):
+            path = path[:-len(suffix)]
     return path
 
 def _walk(proxy, root):
 
-    assert root.endswith('/')
-    ents = list(proxy.dir(root, slash=True))
+    ents = [root]
     while ents:
         ent = ents.pop()
         if ent.endswith('/'):
-            ents.extend(proxy.dir(ent))
+            ents.extend(reversed(proxy.dir(ent, slash=True)))
         else:
             yield ent
 
@@ -91,7 +92,7 @@ def _fetch_structure(proxy, family):
 
 def _sens_namespace(proxy, entity):
 
-    rex = re.compile(r'.+\.[0-9]+')
+    memorypage = re.compile(r'.+\.[0-9]+')
 
     def getter(path, name, val):
         cast = _TYPE_CODE[val.type]
@@ -104,14 +105,13 @@ def _sens_namespace(proxy, entity):
     def walk(path):
         namespace = dict()
         pre = len(path)
-        for i in proxy.dir(path):
+        for i in proxy.dir(path, slash=True):
+            name = _pathname_mangle(i[pre:])
             if i.endswith('/'):
-                name = _pathname_mangle(i[pre:-1])
                 namespace[name] = walk(i)
             else:
-                name = _pathname_mangle(i[pre:])
                 base = i.split('/', 2)[-1]
-                if rex.match(base):
+                if memorypage.match(base):
                     continue
                 val = stru[base]
                 assert isinstance(val, Properties)
@@ -123,9 +123,9 @@ def _sens_namespace(proxy, entity):
                     namespace[name] = staticmethod(getter(i, name, val))
         return namespace
 
+    assert entity.endswith('/')
     assert proxy.present(entity)
-    assert proxy.present(posixpath.join(entity, 'family'))
-    fam = proxy.read(posixpath.join(entity, 'family')).decode()
+    fam = proxy.read(entity + 'family').decode()
     stru = _fetch_structure(proxy, fam)
     namespace = walk(entity) 
     return namespace
@@ -136,25 +136,30 @@ def getsensor(proxy, path):
     return metasensor(ns['type'], (_sensor, object), ns)()
 
 def _main():
-    def walk(prefix, s):
+
+    def recprint(prefix, s):
+        fprint = lambda s1, s2: print(prefix+'{0!s:.<14} {1!r}'.format(s1, s2))
         for att in dir(s):
             fatt = getattr(s, att, None)
             if isinstance(fatt, types.FunctionType):
                 try:
-                    print(prefix, '{0}()'.format(att).ljust(13), fatt())
+                    fprint(att+'()', fatt(), )
                 except protocol.OwnetError as exp:
-                    print(prefix, '{0}()'.format(att).ljust(13), exp)
+                    fprint(att+'()', exp, )
             elif isinstance(fatt, str) and not fatt.startswith('__'):
-                print(prefix, att.ljust(13), fatt)
+                fprint(att, fatt)
             elif isinstance(fatt, _sensor):
-                print(prefix, '{0}/'.format(att).ljust(13))
-                walk('    ' + prefix, fatt)
+                head = prefix+att+'/'
+                print(head)
+                recprint(' '*(len(head)-1) + prefix, fatt)
+
     proxy = protocol.OwnetProxy()
-    for i in proxy.dir():
+    print('sensors on %s' % proxy)
+    for i in proxy.dir(slash=True):
+        print()
         s = getsensor(proxy, i)
         print(s)
-        walk('|--', s)
-        print()
+        recprint('|-', s, )
 
 if __name__ == '__main__':
     _main()
