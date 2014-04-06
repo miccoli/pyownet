@@ -45,7 +45,7 @@ from __future__ import print_function
 import struct
 import socket
 
-# see msg_classification from ow_message.h
+# see 'enum msg_classification' from ow_message.h
 MSG_ERROR = 0
 MSG_NOP = 1
 MSG_READ = 2
@@ -93,12 +93,17 @@ FLG_FORMAT_FIDC =   0x04000000 #  /1067C6697351FF.8D
 FLG_FORMAT_FIC =    0x05000000 #  /1067C6697351FF8D
 MSK_DEVFORMAT =     0xFF000000
 
+# useful paths
+PTH_ERRCODES = '/settings/return_codes/text.ALL'
+
+
 # internal constants
 
 # socket timeout (s)
 _SCK_TIMEOUT = 2.0
 # do not attempt to read messages bigger than this (bytes)
 _MAX_PAYLOAD = 65536
+
 
 def str2bytez(s):
     "transform string to zero-terminated bytes"
@@ -123,23 +128,33 @@ class Error(Exception):
 
 
 class ConnError(Error, IOError):
-    """Connection failed"""
-    pass
-
-
-class ShortRead(Error):
-    pass
-
-
-class ShortWrite(Error):
+    """raised if no valid connection can be established with owserver"""
     pass
 
 
 class ProtocolError(Error):
+    """raised if no valid server response was received"""
+    pass
+
+
+class MalformedHeader(ProtocolError):
+    def __init__(self, msg, header):
+        self.msg = msg
+        self.header = header
+    def __str__(self):
+        return "{0.msg}: {0.header!s} == {0.header!r}".format(self)
+
+
+class ShortRead(ProtocolError):
+    pass
+
+
+class ShortWrite(ProtocolError):
     pass
 
 
 class OwnetError(Error, EnvironmentError):
+    """raised if owserver returns error code"""
     pass
 
 
@@ -292,11 +307,9 @@ class OwnetConnection(object):
         if self.verbose: 
             print('<-', repr(header))
         if header.version != 0:
-            raise ProtocolError('got malformed header: %s "%s"' % 
-                                    (repr(header), header))
+            raise MalformedHeader('bad version magic', header)
         if header.payload > _MAX_PAYLOAD:
-            raise ProtocolError('huge data, unwilling to read: %s "%s"' %
-                                    (repr(header), header))
+            raise MalformedHeader('huge data, unwilling to read', header)
         if header.payload > 0:
             payload = self.socket.recv(header.payload)
             if len(payload) < header.payload:
@@ -349,22 +362,26 @@ class OwnetProxy(object):
         # here we have an open connection, close for now
         conn.shutdown()
 
+        # setup self attributes
         self._sockaddr, self._family = sockaddr, family
         self._hostport = (host, port) # for display only
 
         self.verbose = verbose
         self.flags = flags | FLG_OWNET
 
-        # check if owserver on the line
+        self.errmess = _errtuple()
+
+        # final sanity checks
+        # does the remote end speak the ownet protocol?
         self.ping()
 
-        #self.errmess = _dummy()
-
         # fetch errcodes array from owserver
-        errcodes = '/settings/return_codes/text.ALL'
-        assert self.present(errcodes)
-        self.errmess = _errtuple(
-            m for m in bytes2str(self.read(errcodes)).split(','))
+        try:
+            self.errmess = _errtuple(
+                m for m in bytes2str(self.read(PTH_ERRCODES)).split(','))
+        except OwnetError:
+            # failed, leave the default defined above
+            pass
 
     def __str__(self):
         return "ownet server at %s" % (self._hostport, )
@@ -455,7 +472,7 @@ def _main():
     except ConnError:
         print("No owserver on localhost")
         return 1
-    print("directory on %s:" % proxy)
+    print("directory on {0}:".format(proxy))
     print("id".center(17), "type".center(7))
     for sensor in proxy.dir(slash=False, bus=False):
         stype = bytes2str(proxy.read(sensor + '/type'))
