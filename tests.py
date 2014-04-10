@@ -31,6 +31,8 @@ class TestProtocolModule(unittest.TestCase):
         self.assertRaises(protocol.ConnError, protocol.OwnetProxy, 
             host='nonexistent.fake')
         self.assertRaises(TypeError, self.proxy.dir, 1)
+        self.assertRaises(TypeError, self.proxy.write, '/', 1)
+        self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
 
 if __name__ == '__main__':
     unittest.main()

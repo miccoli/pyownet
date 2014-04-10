@@ -266,14 +266,17 @@ class OwnetConnection(object):
         "establish a connection with server at sockaddr"
         
         self.verbose = verbose
+
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
         self.socket.connect(sockaddr)
+
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
     def shutdown(self):
         "shutdown connection"
+
         self.socket.shutdown(socket.SHUT_RDWR)
         self.socket.close()
 
@@ -336,6 +339,20 @@ class OwnetProxy(object):
         printed on stdout.
         """ 
 
+        # save init args
+        self._hostport = (host, port)
+        self.flags = flags | FLG_OWNET
+        self.verbose = verbose
+
+        # default (empty) errcodes tuple
+        self.errmess = _errtuple()
+
+        #
+        # init logic:
+        # try to connect to the given owserver, send a MSG_NOP,
+        # and check answer
+        #
+
         # resolve host name/port
         try:
             gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
@@ -344,43 +361,26 @@ class OwnetProxy(object):
 
         # gai is a list of tuples, search for the first working one
         lasterr = None
-        for (family, _, _, _, sockaddr) in gai:
+        for (self._family, _, _, _, self._sockaddr) in gai:
             try:
-                conn = OwnetConnection(sockaddr, family, verbose)
-            except socket.error as err:
+                self.ping()
+            except ConnError as err:
                 # not working, go over to next sockaddr
                 lasterr = err
             else:
                 # ok, this is working, stop searching
                 break
         else:
-            # no working (sockaddr, family) found: raise error
-            assert isinstance(lasterr, socket.error)
-            assert isinstance(lasterr, IOError)
-            raise ConnError(*lasterr.args)
+            # no working (sockaddr, family) found: reraise last exception
+            assert isinstance(lasterr, ConnError)
+            raise lasterr
         
-        # here we have an open connection, close for now
-        conn.shutdown()
-
-        # setup self attributes
-        self._sockaddr, self._family = sockaddr, family
-        self._hostport = (host, port) # for display only
-
-        self.verbose = verbose
-        self.flags = flags | FLG_OWNET
-
-        self.errmess = _errtuple()
-
-        # final sanity checks
-        # does the remote end speak the ownet protocol?
-        self.ping()
-
         # fetch errcodes array from owserver
         try:
             self.errmess = _errtuple(
                 m for m in bytes2str(self.read(PTH_ERRCODES)).split(','))
         except OwnetError:
-            # failed, leave the default defined above
+            # failed, leave the default empty errcodes defined above
             pass
 
     def __str__(self):
@@ -394,8 +394,7 @@ class OwnetProxy(object):
         flags |= self.flags
 
         try:
-            conn = OwnetConnection(self._sockaddr, self._family, 
-                       self.verbose)
+            conn = OwnetConnection(self._sockaddr, self._family, self.verbose)
             ret, _, data = conn.req(type, payload, flags, size, offset)
             conn.shutdown()
         except IOError as err:
@@ -413,8 +412,7 @@ class OwnetProxy(object):
         "returns True if there is an entity at path"
 
         ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
-        assert ret <= 0
-        assert len(data) == 0
+        assert ret <= 0 and len(data) == 0
         if ret < 0:
             return False
         else:
@@ -458,26 +456,12 @@ class OwnetProxy(object):
         ensure proper encoding.
         """
 
-        assert isinstance(data, bytes)
+        # fixme: check of path type delayed to str2bytez
+        if not isinstance(data, bytes):
+            raise TypeError("'data' argument must be of type 'bytes'")
+
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data, 
             size=len(data))
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
-
-def _main():
-    # print sensors on localhost owserver
-    try:
-        proxy = OwnetProxy()
-    except ConnError:
-        print("No owserver on localhost")
-        return 1
-    print("directory on {0}:".format(proxy))
-    print("id".center(17), "type".center(7))
-    for sensor in proxy.dir(slash=False, bus=False):
-        stype = bytes2str(proxy.read(sensor + '/type'))
-        print(sensor.ljust(17), stype.ljust(7))
-    return 0
-
-if __name__ == '__main__':
-    _main()
