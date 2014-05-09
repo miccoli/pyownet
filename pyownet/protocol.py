@@ -45,6 +45,12 @@ from __future__ import print_function
 import struct
 import socket
 
+_MSG_WAITALL = socket.MSG_WAITALL
+
+if __debug__:
+    import errno
+    _ENOTCONN = errno.ENOTCONN
+
 # see 'enum msg_classification' from ow_message.h
 MSG_ERROR = 0
 MSG_NOP = 1
@@ -277,7 +283,11 @@ class OwnetConnection(object):
     def shutdown(self):
         "shutdown connection"
 
-        self.socket.shutdown(socket.SHUT_RDWR)
+        try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except IOError as err:
+            assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
+            pass
         self.socket.close()
 
     def req(self, type, payload, flags, size=0, offset=0):
@@ -302,7 +312,7 @@ class OwnetConnection(object):
         
     def _read_msg(self):
         "read message from server"
-        header = self.socket.recv(_FromServerHeader.header_size)
+        header = self.socket.recv(_FromServerHeader.header_size, _MSG_WAITALL)
         if len(header) < _FromServerHeader.header_size:
             raise ShortRead('Error reading header, got %s' % repr(header))
         assert(len(header) == _FromServerHeader.header_size)
@@ -314,7 +324,7 @@ class OwnetConnection(object):
         if header.payload > _MAX_PAYLOAD:
             raise MalformedHeader('huge data, unwilling to read', header)
         if header.payload > 0:
-            payload = self.socket.recv(header.payload)
+            payload = self.socket.recv(header.payload, _MSG_WAITALL)
             if len(payload) < header.payload:
                 raise ShortRead('got %s' % repr(header)+':'+repr(payload))
             if self.verbose: 
@@ -396,9 +406,9 @@ class OwnetProxy(object):
         try:
             conn = OwnetConnection(self._sockaddr, self._family, self.verbose)
             ret, _, data = conn.req(type, payload, flags, size, offset)
-            conn.shutdown()
         except IOError as err:
             raise ConnError(*err.args)
+        conn.shutdown()
 
         return ret, data
 
