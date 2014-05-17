@@ -1,8 +1,6 @@
 
 document that every pathname has to by an ASCIIZ string in the wire
 
-sending on the wire non ASCIIZ strings gives unpredictable results 
-
 FLG_ALIAS is apparently not working
 
 on the dir() reply offset field seems to code some info (?)

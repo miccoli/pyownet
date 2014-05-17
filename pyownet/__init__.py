@@ -17,5 +17,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__version__ = '0.7.1.dev0'
+__version__ = '0.7.2.dev2'
 __version__ += '.devs0'
