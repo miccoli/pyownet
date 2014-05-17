@@ -148,7 +148,8 @@ class MalformedHeader(ProtocolError):
         self.msg = msg
         self.header = header
     def __str__(self):
-        return "{0.msg}: {0.header!s} == {0.header!r}".format(self)
+        return "{0.msg}, got {1!r} decoded as {0.header!r}".format(self, 
+            str(self.header))
 
 
 class ShortRead(ProtocolError):
@@ -314,19 +315,20 @@ class OwnetConnection(object):
         "read message from server"
         header = self.socket.recv(_FromServerHeader.header_size, _MSG_WAITALL)
         if len(header) < _FromServerHeader.header_size:
-            raise ShortRead('Error reading header, got %s' % repr(header))
+            raise ShortRead("short header, got {0!r}".format(header))
         assert(len(header) == _FromServerHeader.header_size)
         header = _FromServerHeader(header)
         if self.verbose: 
             print('<-', repr(header))
         if header.version != 0:
-            raise MalformedHeader('bad version magic', header)
+            raise MalformedHeader('bad version', header)
         if header.payload > _MAX_PAYLOAD:
-            raise MalformedHeader('huge data, unwilling to read', header)
+            raise MalformedHeader('huge payload, unwilling to read', header)
         if header.payload > 0:
             payload = self.socket.recv(header.payload, _MSG_WAITALL)
             if len(payload) < header.payload:
-                raise ShortRead('got %s' % repr(header)+':'+repr(payload))
+                raise ShortRead("short payload, got {0:d} bytes "
+                    "instead of {1:d}".format(len(payload), header.payload))
             if self.verbose: 
                 print('..', repr(payload))
             assert header.size <= header.payload
