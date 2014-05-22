@@ -24,8 +24,10 @@ import re
 
 from pyownet import protocol
 
+_STRUCT_DIR = '/structure/'
 _TYPE_CODE = dict(i=int, u=int, f=float, l=str, a=str, b=bytes, y=bool, 
     d=str, t=float, g=float, p=float)
+PAGE = re.compile(r'.+\.[0-9]+')
 
 
 class metasensor(type):
@@ -72,70 +74,90 @@ def _pathname_mangle(path):
             path = path[:-len(suffix)]
     return path
 
-def _walk(proxy, root):
 
-    ents = [root]
-    while ents:
-        ent = ents.pop()
-        if ent.endswith('/'):
-            ents.extend(reversed(proxy.dir(ent, slash=True)))
-        else:
-            yield ent
+def _sens_namespace(proxy, entity, structure):
 
-def _fetch_structure(proxy, family):
-
-    stru = dict()
-    for i in _walk(proxy, '/structure/{0}/'.format(family)):
-        name = i.split('/',3)[-1]
-        stru[name] = Properties(proxy.read(i))
-    return stru
-
-def _sens_namespace(proxy, entity):
-
-    memorypage = re.compile(r'.+\.[0-9]+')
-
-    def getter(path, name, val):
-        cast = _TYPE_CODE[val.type]
+    def getter(path, name, prop):
+        cast = _TYPE_CODE[prop.type]
         read = lambda: cast(proxy.read(path))
         read.__doc__ = "returns %s as %s" % (path, cast)
         # fixme: str(name) is because in python 2 unicode is distinct form str
         read.__name__ = str(name)
         return read
 
-    def walk(path):
+    def rbuild(path):
         namespace = dict()
         pre = len(path)
         for i in proxy.dir(path, slash=True):
             name = _pathname_mangle(i[pre:])
             if i.endswith('/'):
-                namespace[name] = walk(i)
+                namespace[name] = rbuild(i)
             else:
                 base = i.split('/', 2)[-1]
-                if memorypage.match(base):
+                if PAGE.match(base):
                     continue
-                val = stru[base]
-                assert isinstance(val, Properties)
-                if val.mode not in ('ro', 'rw'):
+                prop = structure[base]
+                assert isinstance(prop, Properties)
+                if prop.mode not in ('ro', 'rw'):
                     continue
-                if val.pers == 'f':
-                    namespace[name] = getter(i, name, val)()
+                if prop.pers == 'f':
+                    namespace[name] = getter(i, name, prop)()
                 else:
-                    namespace[name] = staticmethod(getter(i, name, val))
+                    namespace[name] = staticmethod(getter(i, name, prop))
         return namespace
 
     assert entity.endswith('/')
     assert proxy.present(entity)
-    fam = proxy.read(entity + 'family').decode()
-    stru = _fetch_structure(proxy, fam)
-    namespace = walk(entity) 
+    namespace = rbuild(entity) 
     return namespace
 
-def getsensor(proxy, path):
+class Root(object):
 
-    ns = _sens_namespace(proxy, path)
-    return metasensor(ns['type'], (_sensor, object), ns)()
+    def __init__(self, hostport):
+
+        if ':' in hostport:
+            host, port = hostport.split(':')
+            self.proxy = protocol.OwnetProxy(host, port)
+        else:
+            host = hostport
+            self.proxy = protocol.OwnetProxy(host)
+        self._structure = dict()
+
+    def __str__(self):
+        return 'root at {0}'.format(self.proxy)
+
+    def _walk(self, root):
+
+        ents = [root]
+        while ents:
+            ent = ents.pop()
+            if ent.endswith('/'):
+                ents.extend(self.proxy.dir(ent, slash=True))
+            else:
+                yield ent, self.proxy.read(ent)
+
+    def _getstructure(self, family):
+        assert isinstance(family, basestring)
+        if family not in self._structure:
+            self._structure[family] = dict((i.split('/',3)[-1], Properties(j))
+                    for i, j in self._walk(_STRUCT_DIR + family + '/'))
+        return self._structure[family]
+
+    def scan(self):
+        return self.proxy.dir('/', slash=True)
+
+    def getsensor(self, path):
+        assert self.proxy.present(path)
+        assert path.endswith('/')
+        family = self.proxy.read(path + 'family').decode()
+        structure = self._getstructure(family)
+        ns = _sens_namespace(self.proxy, path, structure)
+        return metasensor(ns['type'], (_sensor, object), ns)()
+
 
 def _main():
+
+    import sys
 
     def recprint(prefix, s):
         fprint = lambda s1, s2: print(prefix+'{0!s:.<14} {1!r}'.format(s1, s2))
@@ -153,11 +175,15 @@ def _main():
                 print(head)
                 recprint(' '*(len(head)-1) + prefix, fatt)
 
-    proxy = protocol.OwnetProxy()
-    print('sensors on %s' % proxy)
-    for i in proxy.dir(slash=True):
+    try:
+        hostport = sys.argv[1]
+    except IndexError:
+        hostport = 'localhost'
+    root = Root(hostport)
+    print('sensors on {0}'.format(root))
+    for i in root.scan():
         print()
-        s = getsensor(proxy, i)
+        s = root.getsensor(i)
         print(s)
         recprint('|-', s, )
 

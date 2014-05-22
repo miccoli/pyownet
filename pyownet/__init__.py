@@ -18,4 +18,4 @@
 #
 
 __version__ = '0.7.2.dev2'
-__version__ += '.devs0'
+__version__ += '.devs1'
