@@ -1,7 +1,9 @@
 """owget.py -- a pyownet implementation of owget
 
-This small example shows how to implement a work-a-like of owget in
-module owshell from owfs.
+This small example shows how to implement a work-a-like of owget
+(which is a C program in module owshell from owfs).
+
+This implementation is for python 2.X
 
 This programs parses an owserver URI, constructed in the obvious way:
 'owserver://hostname:port/path' and prints the corresponding state.
