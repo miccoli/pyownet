@@ -297,8 +297,15 @@ class OwnetConnection(object):
         tohead = _ToServerHeader(payload=len(payload), type=type, flags=flags, 
             size=size, offset=offset)
         self._send_msg(tohead, payload)
-        fromhead, data = self._read_msg()
-        return fromhead.ret, fromhead.flags, data
+        while True:
+            fromhead, data = self._read_msg()
+
+            if fromhead.payload < 0 and type != MSG_NOP:
+                # Server said PING to keep connection alive during
+                # lenghty op
+                continue
+
+            return fromhead.ret, fromhead.flags, data
 
     def _send_msg(self, header, payload):
         "send message to server"
