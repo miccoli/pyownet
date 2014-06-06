@@ -4,6 +4,7 @@ import sys
 
 from pyownet.protocol import (OwnetProxy, ConnError, ProtocolError, OwnetError)
 
+
 def main():
     if len(sys.argv) >= 2:
         args = sys.argv[1:]

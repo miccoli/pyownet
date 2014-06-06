@@ -1,9 +1,9 @@
 """ownet protocol implementation
 
-This module is a pure python, low level implementation of the ownet 
+This module is a pure python, low level implementation of the ownet
 protocol.
 
-OwnetProxy instances are proxy objects whose methods correspond to ownet 
+OwnetProxy instances are proxy objects whose methods correspond to ownet
 protocol messages.
 
 >>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
@@ -18,7 +18,7 @@ True
 >>> owproxy.dir()
 ['/sensA/', '/05.4AEC29CDBAAB/']
 
-The OwnetConnection class encapsulates all socket operations and 
+The OwnetConnection class encapsulates all socket operations and
 interactions with the server and is meant for internal use.
 
 """
@@ -30,12 +30,12 @@ interactions with the server and is meant for internal use.
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -72,7 +72,7 @@ FLG_SAFEMODE =    0x00000010
 FLG_UNCACHED =    0x00000020
 FLG_OWNET =       0x00000100
 
-# look for 
+# look for
 # 'enum temp_type' in ow_temperature.h
 # 'enum pressure_type' in ow_pressure.h
 # 'enum deviceformat' in ow.h
@@ -91,12 +91,12 @@ FLG_PRESS_PSI =     0x00100000
 FLG_PRESS_PA =      0x00140000
 MSK_PRESSURESCALE = 0x001C0000
 
-FLG_FORMAT_FDI =    0x00000000 #  /10.67C6697351FF
-FLG_FORMAT_FI =     0x01000000 #  /1067C6697351FF
-FLG_FORMAT_FDIDC =  0x02000000 #  /10.67C6697351FF.8D
-FLG_FORMAT_FDIC  =  0x03000000 #  /10.67C6697351FF8D
-FLG_FORMAT_FIDC =   0x04000000 #  /1067C6697351FF.8D
-FLG_FORMAT_FIC =    0x05000000 #  /1067C6697351FF8D
+FLG_FORMAT_FDI =    0x00000000   # /10.67C6697351FF
+FLG_FORMAT_FI =     0x01000000   # /1067C6697351FF
+FLG_FORMAT_FDIDC =  0x02000000   # /10.67C6697351FF.8D
+FLG_FORMAT_FDIC  =  0x03000000   # /10.67C6697351FF8D
+FLG_FORMAT_FIDC =   0x04000000   # /1067C6697351FF.8D
+FLG_FORMAT_FIC =    0x05000000   # /1067C6697351FF8D
 MSK_DEVFORMAT =     0xFF000000
 
 # useful paths
@@ -147,9 +147,10 @@ class MalformedHeader(ProtocolError):
     def __init__(self, msg, header):
         self.msg = msg
         self.header = header
+
     def __str__(self):
-        return "{0.msg}, got {1!r} decoded as {0.header!r}".format(self, 
-            str(self.header))
+        return "{0.msg}, got {1!r} decoded as {0.header!r}".format(
+            self, str(self.header))
 
 
 class ShortRead(ProtocolError):
@@ -170,7 +171,7 @@ class OwnetError(Error, EnvironmentError):
 #
 
 class _errtuple(tuple):
-    
+
     def __getitem__(self, i):
         try:
             return super(_errtuple, self).__getitem__(i)
@@ -217,7 +218,7 @@ class _Header(bytes):
         if args:
             msg = args[0]
             # FIXME check for args type and semantics
-            assert len(args)==1
+            assert len(args) == 1
             assert not kwargs
             assert isinstance(msg, bytes)
             assert len(msg) == cls.header_size
@@ -226,8 +227,8 @@ class _Header(bytes):
         else:
             vals = tuple(map(kwargs.pop, cls._fields, cls._defaults))
             if kwargs:
-                raise TypeError(
-  "constructor got unexpected keyword argument '%s'" % kwargs.popitem()[0] )
+                raise TypeError("constructor got unexpected keyword argument"
+                                " '%s'" % kwargs.popitem()[0])
             msg = cls._struct.pack(*vals)
         assert isinstance(msg, bytes)
         assert isinstance(vals, tuple)
@@ -239,9 +240,8 @@ class _Header(bytes):
         repr += ')'
         return repr
 
-
     def __new__(cls, *args, **kwargs):
- 
+
         #if cls is _Header:
         #    raise TypeError("_Header class may not be instantiated")
         msg, vals = cls._parse(*args, **kwargs)
@@ -271,7 +271,7 @@ class OwnetConnection(object):
 
     def __init__(self, sockaddr, family=socket.AF_INET, verbose=False):
         "establish a connection with server at sockaddr"
-        
+
         self.verbose = verbose
 
         self.socket = socket.socket(family, socket.SOCK_STREAM)
@@ -291,16 +291,16 @@ class OwnetConnection(object):
             pass
         self.socket.close()
 
-    def req(self, type, payload, flags, size=0, offset=0):
+    def req(self, msgtype, payload, flags, size=0, offset=0):
         "send message to server and return response"
 
-        tohead = _ToServerHeader(payload=len(payload), type=type, flags=flags, 
-            size=size, offset=offset)
+        tohead = _ToServerHeader(payload=len(payload), type=msgtype,
+                                 flags=flags, size=size, offset=offset)
         self._send_msg(tohead, payload)
         while True:
             fromhead, data = self._read_msg()
 
-            if fromhead.payload < 0 and type != MSG_NOP:
+            if fromhead.payload < 0 and msgtype != MSG_NOP:
                 # Server said PING to keep connection alive during
                 # lenghty op
                 continue
@@ -317,7 +317,7 @@ class OwnetConnection(object):
         if sent < len(header + payload):
             raise ShortWrite()
         assert sent == len(header + payload), sent
-        
+
     def _read_msg(self):
         "read message from server"
         header = self.socket.recv(_FromServerHeader.header_size, _MSG_WAITALL)
@@ -325,7 +325,7 @@ class OwnetConnection(object):
             raise ShortRead("short header, got {0!r}".format(header))
         assert(len(header) == _FromServerHeader.header_size)
         header = _FromServerHeader(header)
-        if self.verbose: 
+        if self.verbose:
             print('<-', repr(header))
         if header.version != 0:
             raise MalformedHeader('bad version', header)
@@ -334,9 +334,10 @@ class OwnetConnection(object):
         if header.payload > 0:
             payload = self.socket.recv(header.payload, _MSG_WAITALL)
             if len(payload) < header.payload:
-                raise ShortRead("short payload, got {0:d} bytes "
+                raise ShortRead(
+                    "short payload, got {0:d} bytes "
                     "instead of {1:d}".format(len(payload), header.payload))
-            if self.verbose: 
+            if self.verbose:
                 print('..', repr(payload))
             assert header.size <= header.payload
             payload = payload[:header.size]
@@ -348,15 +349,15 @@ class OwnetConnection(object):
 class OwnetProxy(object):
     """Objects of this class define methods to query a given owserver"""
 
-    def __init__(self, host='localhost', port=4304, flags=0, 
+    def __init__(self, host='localhost', port=4304, flags=0,
                  verbose=False, ):
         """return an ownet proxy object bound at (host, port); default is
-        (localhost, 4304). 
+        (localhost, 4304).
 
         'flags' are or-ed in the header of each query sent to owserver.
-        If verbose is True, details on each sent and received packet is 
+        If verbose is True, details on each sent and received packet is
         printed on stdout.
-        """ 
+        """
 
         # save init args
         self._hostport = (host, port)
@@ -393,7 +394,7 @@ class OwnetProxy(object):
             # no working (sockaddr, family) found: reraise last exception
             assert isinstance(lasterr, ConnError)
             raise lasterr
-        
+
         # fetch errcodes array from owserver
         try:
             self.errmess = _errtuple(
@@ -405,8 +406,8 @@ class OwnetProxy(object):
     def __str__(self):
         return "ownet server at %s" % (self._hostport, )
 
-    def sendmess(self, type, payload, flags=0, size=0, offset=0):
-        """ retcode, data = sendmess(type, payload)
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+        """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
         """
 
@@ -414,7 +415,7 @@ class OwnetProxy(object):
 
         try:
             conn = OwnetConnection(self._sockaddr, self._family, self.verbose)
-            ret, _, data = conn.req(type, payload, flags, size, offset)
+            ret, _, data = conn.req(msgtype, payload, flags, size, offset)
         except IOError as err:
             raise ConnError(*err.args)
         conn.shutdown()
@@ -423,7 +424,7 @@ class OwnetProxy(object):
 
     def ping(self):
         "sends a NOP packet and waits response; returns None"
-        ret, data =  self.sendmess(MSG_NOP, bytes())
+        ret, data = self.sendmess(MSG_NOP, bytes())
         if (ret, data) != (0, bytes()):
             raise OwnetError(-ret, self.errmess[-ret])
 
@@ -479,8 +480,8 @@ class OwnetProxy(object):
         if not isinstance(data, bytes):
             raise TypeError("'data' argument must be of type 'bytes'")
 
-        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data, 
-            size=len(data))
+        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
+                                   size=len(data))
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
