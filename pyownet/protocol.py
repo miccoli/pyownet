@@ -276,10 +276,16 @@ class OwnetConnection(object):
 
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
+        ## ??
+        ret = self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         self.socket.connect(sockaddr)
 
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
+
+    def __str__(self):
+        return "OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
+                                                   self.socket.getpeername())
 
     def shutdown(self):
         "shutdown connection"
@@ -344,7 +350,6 @@ class OwnetConnection(object):
         else:
             payload = bytes()
         return header, payload
-
 
 class OwnetProxy(object):
     """Objects of this class define methods to query a given owserver"""
@@ -485,3 +490,42 @@ class OwnetProxy(object):
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
+
+class _PersistentProxy(OwnetProxy):
+
+    def __init__(self, parent):
+        if not isinstance(parent, OwnetProxy):
+            raise ValueError('parent must by an OwnetProxy instance')
+        self.parent = parent
+        self.errmess = self.parent.errmess
+        self.flags = self.parent.flags | FLG_PERSISTENCE
+        self.conn = None
+
+    def __str__(self):
+        return "ownet persistent connection: {0!s}".format(self.conn)
+
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+        """ retcode, data = sendmess(msgtype, payload)
+        send generic message and returns retcode, data
+        """
+
+        flags |= self.flags
+
+        if not self.conn:
+            try:
+                self.conn = OwnetConnection(self.parent._sockaddr, 
+                                            self.parent._family, 
+                                            self.parent.verbose)
+            except IOError as err:
+                raise ConnError(*err.args)
+
+        try:
+            ret, flags, data = self.conn.req(
+                msgtype, payload, flags, size, offset)
+        except IOError as err:
+            raise ConnError(*err.args)
+        if not (flags & FLG_PERSISTENCE):
+            self.conn = None
+
+        return ret, data
+
