@@ -45,7 +45,10 @@ from __future__ import print_function
 import struct
 import socket
 
+# socket constants
 _MSG_WAITALL = socket.MSG_WAITALL
+_SOL_SOCKET = socket.SOL_SOCKET
+_SO_KEEPALIVE = socket.SO_KEEPALIVE
 
 if __debug__:
     import errno
@@ -277,7 +280,7 @@ class OwnetConnection(object):
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
         ## ??
-        ret = self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
         self.socket.connect(sockaddr)
 
         if self.verbose:
@@ -525,6 +528,7 @@ class _PersistentProxy(OwnetProxy):
         except IOError as err:
             raise ConnError(*err.args)
         if not (flags & FLG_PERSISTENCE):
+            self.conn.shutdown()
             self.conn = None
 
         return ret, data
