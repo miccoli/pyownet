@@ -17,5 +17,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__version__ = '0.7.3.dev1'
+__version__ = '0.7.3'
 __version__ += '.pers0'
