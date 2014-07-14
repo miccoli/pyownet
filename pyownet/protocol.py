@@ -494,18 +494,42 @@ class OwnetProxy(object):
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
 
+    def persistent_clone(self):
+        return _PersistentProxy(self)
+
 class _PersistentProxy(OwnetProxy):
 
     def __init__(self, parent):
         if not isinstance(parent, OwnetProxy):
             raise ValueError('parent must by an OwnetProxy instance')
-        self.parent = parent
-        self.errmess = self.parent.errmess
-        self.flags = self.parent.flags | FLG_PERSISTENCE
+
+        self._hostport = parent._hostport
+        self.flags = parent.flags | FLG_PERSISTENCE
+        self.verbose = parent.verbose
+        self.errmess = parent.errmess
+        self._family = parent._family
+        self._sockaddr = parent._sockaddr
+
         self.conn = None
 
-    def __str__(self):
-        return "ownet persistent connection: {0!s}".format(self.conn)
+    def __enter__(self):
+        self._open_connection()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            self.conn.shutdown()
+            self.conn = None
+        pass
+
+    def _open_connection(self):
+        assert self.conn is None
+        try:
+            self.conn = OwnetConnection(self._sockaddr,
+                                        self._family,
+                                        self.verbose)
+        except IOError as err:
+            raise ConnError(*err.args)
 
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(msgtype, payload)
@@ -515,13 +539,7 @@ class _PersistentProxy(OwnetProxy):
         flags |= self.flags
 
         if not self.conn:
-            try:
-                self.conn = OwnetConnection(self.parent._sockaddr, 
-                                            self.parent._family, 
-                                            self.parent.verbose)
-            except IOError as err:
-                raise ConnError(*err.args)
-
+            self._open_connection()
         try:
             ret, flags, data = self.conn.req(
                 msgtype, payload, flags, size, offset)
@@ -532,4 +550,3 @@ class _PersistentProxy(OwnetProxy):
             self.conn = None
 
         return ret, data
-
