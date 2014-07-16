@@ -1,3 +1,4 @@
+from __future__ import print_function
 import time
 import threading
 from ConfigParser import ConfigParser
@@ -18,6 +19,9 @@ PORT = config.get('server', 'port')
 
 MTHR = 6
 
+tst = lambda: time.strftime('%T')
+def log(s):
+    print(tst(), s)
 
 def main():
     proxy = protocol.OwnetProxy(HOST, PORT, verbose=False)
@@ -27,7 +31,7 @@ def main():
         ver = proxy.read('/system/configuration/version').decode()
     except protocol.OwnetError:
         pass
-    print "{0}, pid={1:d}, {2}".format(proxy, pid, ver)
+    log("{0}, pid={1:d}, {2}".format(proxy, pid, ver))
 
     delta = 1
     for i in range(MTHR):
@@ -39,18 +43,21 @@ def main():
 
 def worker(proxy, id):
 
-    with proxy.persistent_clone() as pers:
-        print '**[{0:02d}] {1}'.format(id, pers.conn)
+    with proxy.clone_persistent() as pers:
+        log('**[{0:02d}] {1}'.format(id, pers.conn))
 
+        iter = 0
         nap = 1
         while True:
-            nap *= 2
             time.sleep(nap)
             try:
-                pers.dir()
+                res = pers.dir()
+                log('..[{0:02d}.{2:d}] {1}'.format(id, res, iter))
             except protocol.Error as exc:
-                print '!![{0:02d}] dead after {1:d}s: {2}'.format(id, nap, exc)
+                log('!![{0:02d}] dead after {1:d}s: {2}'.format(id, nap, exc))
                 break
+            iter += 1
+            nap *= 2
 
 if __name__ == '__main__':
     main()

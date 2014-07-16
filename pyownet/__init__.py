@@ -18,4 +18,4 @@
 #
 
 __version__ = '0.7.3'
-__version__ += '.pers1'
+__version__ += '.pers2'
