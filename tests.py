@@ -1,15 +1,30 @@
 import unittest
 from pyownet import protocol
 
+from ConfigParser import ConfigParser
+
+config = ConfigParser()
+
+config.add_section('server')
+config.set('server', 'host', 'localhost')
+config.set('server', 'port', '4304')
+
+config.read(['tests.ini'])
+
+HOST = config.get('server', 'host')
+PORT = config.get('server', 'port')
+
+
 class TestProtocolModule(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         try:
-            cls.proxy = protocol.OwnetProxy()
+            cls.proxy = protocol.OwnetProxy(HOST, PORT)
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on localhost, got:%s' % exc)
-  
+            raise RuntimeError('no owserver on %s:%s, got:%s' %
+                               (HOST, PORT, exc))
+
     def test_ping(self):
         self.assertIsNone(self.proxy.ping())
 
@@ -28,12 +43,13 @@ class TestProtocolModule(unittest.TestCase):
     def test_exceptions(self):
         self.assertRaises(protocol.OwnetError, self.proxy.dir, '/nonexistent')
         self.assertRaises(protocol.OwnetError, self.proxy.read, '/')
-        self.assertRaises(protocol.ConnError, protocol.OwnetProxy, 
-            host='nonexistent.fake')
+        self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
+                          host='nonexistent.fake')
+        self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
+        self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
         self.assertRaises(TypeError, self.proxy.dir, 1)
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
 
 if __name__ == '__main__':
     unittest.main()
-

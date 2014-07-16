@@ -4,6 +4,7 @@ import sys
 
 from pyownet.protocol import (OwnetProxy, ConnError, ProtocolError, OwnetError)
 
+
 def main():
     if len(sys.argv) >= 2:
         args = sys.argv[1:]
@@ -24,13 +25,13 @@ def main():
         ver = None
         try:
             pid = int(proxy.read('/system/process/pid'))
-            ver = proxy.read('/system/configuration/version')
+            ver = proxy.read('/system/configuration/version').decode()
         except OwnetError:
             pass
         print('{0}, pid = {1:d}, ver = {2}'.format(proxy, pid, ver))
         print('{0:^17} {1:^7} {2:>7}'.format('id', 'type', 'temp.'))
         for sensor in proxy.dir(slash=False, bus=False):
-            stype = proxy.read(sensor + '/type').decode('ascii')
+            stype = proxy.read(sensor + '/type').decode()
             try:
                 temp = float(proxy.read(sensor + '/temperature'))
                 temp = "{0:.2f}".format(temp)
