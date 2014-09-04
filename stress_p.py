@@ -1,4 +1,6 @@
 from __future__ import print_function
+
+import atexit
 import time
 import threading
 from ConfigParser import ConfigParser
@@ -17,14 +19,14 @@ config.read(['tests.ini'])
 HOST = config.get('server', 'host')
 PORT = config.get('server', 'port')
 
-MTHR = 6
+MTHR = 10
 
 tst = lambda: time.strftime('%T')
 def log(s):
     print(tst(), s)
 
 def main():
-    proxy = protocol.OwnetProxy(HOST, PORT, verbose=False)
+    proxy = protocol.proxy(HOST, PORT, verbose=True)
     pid = ver = ''
     try:
         pid = int(proxy.read('/system/process/pid'))
@@ -41,9 +43,11 @@ def main():
         delta *= 2
 
 
+connstatus = lambda x: '+' if x.conn else '_'
+
 def worker(proxy, id):
 
-    with proxy.clone_persistent() as pers:
+    with protocol.clone_persistent(proxy) as pers:
         log('**[{0:02d}] {1}'.format(id, pers.conn))
 
         iter = 0
@@ -52,12 +56,17 @@ def worker(proxy, id):
             time.sleep(nap)
             try:
                 res = pers.dir()
-                log('..[{0:02d}.{2:d}] {1}'.format(id, res, iter))
+                log('..[{0:02d}.{2:02d} {3}] {1}'.format(
+                    id, res, iter, connstatus(pers)))
             except protocol.Error as exc:
                 log('!![{0:02d}] dead after {1:d}s: {2}'.format(id, nap, exc))
                 break
             iter += 1
             nap *= 2
+
+@atexit.register
+def goodbye():
+    log('exiting stress_p')
 
 if __name__ == '__main__':
     main()

@@ -45,6 +45,8 @@ from __future__ import print_function
 import struct
 import socket
 
+import pyownet
+
 # socket constants
 _MSG_WAITALL = socket.MSG_WAITALL
 _SOL_SOCKET = socket.SOL_SOCKET
@@ -114,6 +116,10 @@ _SCK_TIMEOUT = 2.0
 _MAX_PAYLOAD = 65536
 
 
+#
+# code /decode functions
+#
+
 def str2bytez(s):
     "transform string to zero-terminated bytes"
     if not isinstance(s, basestring):
@@ -132,7 +138,7 @@ def bytes2str(b):
 # exceptions
 #
 
-class Error(Exception):
+class Error(pyownet.Error):
     """Base class for all module errors"""
     pass
 
@@ -171,17 +177,26 @@ class OwnetError(Error, EnvironmentError):
 
 
 #
-# classes
+# supporting types (internal)
 #
 
 class _errtuple(tuple):
+    """tuple subtype for "error number" -> "error message" mapping
+
+    if error number is not defined returns a standard message"""
+
+    _message = '(unkown error)'
 
     def __getitem__(self, i):
         try:
             return super(_errtuple, self).__getitem__(i)
         except IndexError:
-            return '(unkown error)'
+            return self._message
 
+
+#
+# classes for message headers (internal)
+#
 
 class _addfieldprops(type):
     """metaclass for adding properties"""
@@ -270,6 +285,10 @@ class _FromServerHeader(_Header):
     _defaults = (0, 0, 0, FLG_OWNET, 0, 0)
 
 
+#
+# connection object
+#
+
 class OwnetConnection(object):
     """This class encapsulates a connection to an owserver"""
 
@@ -280,7 +299,7 @@ class OwnetConnection(object):
 
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
-        ## ??
+        ## FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
         self.socket.connect(sockaddr)
 
@@ -293,6 +312,9 @@ class OwnetConnection(object):
 
     def shutdown(self):
         "shutdown connection"
+
+        if self.verbose:
+            print(self.socket.getsockname(), 'xx', self.socket.getpeername())
 
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -356,9 +378,13 @@ class OwnetConnection(object):
         return header, payload
 
 
-class _Proxy(object):
-    """Proxy class with methods to query an owserver, non persistent"""
+#
+# proxy objects
+#
 
+class _Proxy(object):
+    """Proxy object with methods to query an owserver, 
+    socket connection is non persistent, stateless, thread-safe"""
 
     # no init logic, should be instatiated by a factory function
     def __init__(self, family_address, flags=0,
@@ -454,6 +480,65 @@ class _Proxy(object):
             raise OwnetError(-ret, self.errmess[-ret], path)
 
 
+class _PersistentProxy(_Proxy):
+    """Proxy object with methods to query an owserver, 
+    socket connection is persistent, statefull, not thread-safe"""
+
+    def __init__(self, family_address,
+                 flags=0, verbose=False, errmess=_errtuple(), ):
+
+        super(_PersistentProxy, self).__init__(
+            family_address, flags | FLG_PERSISTENCE, verbose, errmess)
+
+        self.conn = None
+        assert self.flags & FLG_PERSISTENCE
+
+
+    def __enter__(self):
+        if not self.conn:
+            self._open_connection()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            self._close_connection()
+
+    def _open_connection(self):
+        assert self.conn is None
+        try:
+            self.conn = OwnetConnection(self._sockaddr,
+                                        self._family,
+                                        self.verbose)
+        except IOError as err:
+            raise ConnError(*err.args)
+
+    def _close_connection(self):
+        assert not self.conn is None
+        self.conn.shutdown()
+        self.conn = None
+
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+        """ retcode, data = sendmess(msgtype, payload)
+        send generic message and returns retcode, data
+        """
+
+        # ensure that there is an open connection
+        if not self.conn:
+            self._open_connection()
+
+        flags |= self.flags
+        try:
+            ret, rflags, data = self.conn.req(
+                msgtype, payload, flags, size, offset)
+        except IOError as err:
+            raise ConnError(*err.args)
+        # persistence not granted
+        if not (rflags & FLG_PERSISTENCE):
+            self._close_connection()
+
+        return ret, data
+
+
 class OwnetProxy(_Proxy):
     """Objects of this class define methods to query a given owserver"""
 
@@ -510,67 +595,13 @@ class OwnetProxy(_Proxy):
             # failed, leave the default empty errcodes defined above
             pass
 
-    def clone_persistent(self):
-        """return a clone Proxy object with persistent connections"""
 
-        return _OwPersistentProxy((self._family, self._sockaddr), 
-            self.flags, self.verbose, self.errmess)
+#
+# factory functions
+#
 
-
-class _OwPersistentProxy(_Proxy):
-    """Proxy class with methods to query an owserver, persistent"""
-
-    def __init__(self, family_address, 
-                 flags=0, verbose=False, errmess=_errtuple(), ):
-
-        super(_OwPersistentProxy, self).__init__(family_address,
-              flags | FLG_PERSISTENCE, verbose, errmess)
-
-        self.conn = None
-
-    def __enter__(self):
-        self._open_connection()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.conn:
-            self.conn.shutdown()
-            self.conn = None
-        pass
-
-    def _open_connection(self):
-        assert self.conn is None
-        try:
-            self.conn = OwnetConnection(self._sockaddr,
-                                        self._family,
-                                        self.verbose)
-        except IOError as err:
-            raise ConnError(*err.args)
-
-    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
-        """ retcode, data = sendmess(msgtype, payload)
-        send generic message and returns retcode, data
-        """
-
-        flags |= self.flags
-
-        if not self.conn:
-            self._open_connection()
-        try:
-            ret, flags, data = self.conn.req(
-                msgtype, payload, flags, size, offset)
-        except IOError as err:
-            raise ConnError(*err.args)
-        if not (flags & FLG_PERSISTENCE):
-            self.conn.shutdown()
-            self.conn = None
-
-        return ret, data
-
-
-def proxy(host='localhost', port=4304, flags=0, persistent=False, 
+def proxy(host='localhost', port=4304, flags=0, persistent=False,
           verbose=False, ):
-
     """factory function that returns a proxy object for an owserver at
        host, port. """
 
@@ -578,6 +609,13 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
 
     owp = OwnetProxy(host, port, flags, verbose)
     if persistent:
-        owp = owp.clone_persistent()
+        owp = clone_persistent(owp)
 
     return owp
+
+def clone_persistent(proxy):
+    if not isinstance(proxy, _Proxy):
+        raise TypeError('argument is not a Proxy object')
+    return _PersistentProxy((proxy._family, proxy._sockaddr),
+                              proxy.flags, proxy.verbose, proxy.errmess)
+

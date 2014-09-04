@@ -53,7 +53,7 @@ class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
 
-class TestProtocolproxy_factory(unittest.TestCase, _ProxyTestMix):
+class TestProtocol_proxy_factory(unittest.TestCase, _ProxyTestMix):
 
     @classmethod
     def setUpClass(cls):
@@ -63,7 +63,7 @@ class TestProtocolproxy_factory(unittest.TestCase, _ProxyTestMix):
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
 
-class TestProtocolproxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
+class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
 
     @classmethod
     def setUpClass(cls):
@@ -73,6 +73,13 @@ class TestProtocolproxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
 
+
+class TestProtocol_clone_persistent(unittest.TestCase):
+
+
+    def test_exceptions(self):
+        self.assertRaises(TypeError, protocol.clone_persistent, 1)
+        pass
 
 if __name__ == '__main__':
     unittest.main()
