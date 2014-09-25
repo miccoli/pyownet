@@ -47,7 +47,7 @@ connstatus = lambda x: '+' if x.conn else '_'
 
 def worker(proxy, id):
 
-    with protocol.clone_persistent(proxy) as pers:
+    with protocol.clone(proxy, persistent=True) as pers:
         log('**[{0:02d}] {1}'.format(id, pers.conn))
 
         iter = 0

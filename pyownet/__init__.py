@@ -18,7 +18,8 @@
 #
 
 __all__ = ['__version__', 'proxy']
-__version__ = '0.8.0-beta.dev1'
+__version__ = '0.8.0-beta.dev2'
+
 
 class Error(Exception):
     """Base class for all package errors"""

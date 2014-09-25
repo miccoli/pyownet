@@ -97,7 +97,7 @@ def main():
     #
     try:
         proxy = pyownet.proxy(
-            host, port, flags=args.t_flags | fcodes[args.format], 
+            host, port, flags=args.t_flags | fcodes[args.format],
             persistent=True)
     except (ConnError, ProtocolError) as error:
         parser.exit(status=1, message=str(error)+'\n')
@@ -111,6 +111,9 @@ def main():
                 for entity in proxy.dir(path, bus=True):
                     walk(entity)
         except OwnetError as error:
+            print('Unable to walk {}: server says {}'.format(path, error),
+                  file=sys.stderr)
+        except ConnError as error:
             print('Unable to walk {}: {}'.format(path, error), file=sys.stderr)
 
     walk(urlc.path)

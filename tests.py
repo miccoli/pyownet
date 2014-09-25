@@ -16,6 +16,7 @@ PORT = config.get('server', 'port')
 
 
 class _ProxyTestMix(object):
+    # mixin class for proxy object testing
 
     def test_ping(self):
         self.assertIsNone(self.proxy.ping())
@@ -43,6 +44,7 @@ class _ProxyTestMix(object):
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
 
+
 class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
 
     @classmethod
@@ -53,6 +55,7 @@ class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
 
+
 class TestProtocol_proxy_factory(unittest.TestCase, _ProxyTestMix):
 
     @classmethod
@@ -62,6 +65,7 @@ class TestProtocol_proxy_factory(unittest.TestCase, _ProxyTestMix):
         except protocol.ConnError as exc:
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
+
 
 class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
 
@@ -74,11 +78,10 @@ class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
                                (HOST, PORT, exc))
 
 
-class TestProtocol_clone_persistent(unittest.TestCase):
-
+class TestProtocol_clone(unittest.TestCase):
 
     def test_exceptions(self):
-        self.assertRaises(TypeError, protocol.clone_persistent, 1)
+        self.assertRaises(TypeError, protocol.clone, 1)
         pass
 
 if __name__ == '__main__':
