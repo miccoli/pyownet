@@ -587,19 +587,20 @@ class OwnetProxy(_Proxy):
             raise ConnError(*err.args)
 
         # gai is a list of tuples, search for the first working one
+        lasterr = None
         for (self._family, _, _, _, self._sockaddr) in gai:
             try:
                 self.ping()
             except ConnError as err:
                 # not working, go over to next sockaddr
-                pass
+                lasterr = err
             else:
                 # ok, this is working, stop searching
                 break
         else:
             # no working (sockaddr, family) found: reraise last exception
-            assert isinstance(err, ConnError)
-            raise err
+            assert isinstance(lasterr, ConnError)
+            raise lasterr
 
         # fetch errcodes array from owserver
         try:
@@ -631,21 +632,22 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
         raise ConnError(*err.args)
 
     # gai is a list of tuples, search for the first working one
+    lasterr = None
     for (family, _, _, _, sockaddr) in gai:
         try:
             owp = pclass(family, sockaddr, flags, verbose)
             owp.ping()
         except ConnError as err:
             # not working, go over to next sockaddr
-            # fixme, release owp resources
-            pass
+            lasterr = err
+            # fixme: should release owp resources?
         else:
             # ok, this is working, stop searching
             break
     else:
         # no working (sockaddr, family) found: reraise last exception
-        assert isinstance(err, ConnError)
-        raise err
+        assert isinstance(lasterr, ConnError)
+        raise lasterr
 
     # fixme: should this be only optional?
     owp._init_errcodes()

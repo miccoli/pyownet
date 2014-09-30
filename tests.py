@@ -78,9 +78,10 @@ class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
                                (HOST, PORT, exc))
 
 
-class TestProtocol_clone(unittest.TestCase):
+class TestProtocol_misc(unittest.TestCase):
 
     def test_exceptions(self):
+        self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
         self.assertRaises(TypeError, protocol.clone, 1)
         pass
 
