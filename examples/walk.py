@@ -74,6 +74,9 @@ def main():
     parser.add_argument('-f', '--format', choices=fcodes,
                         help='format for 1-wire unique serial IDs display')
 
+    parser.add_argument('--nosys', '--only-sensors',
+                        action='store_false', dest='bus',
+                        help='do not descend system directories')
     #
     # parse command line args
     #
@@ -108,7 +111,7 @@ def main():
                 val = proxy.read(path)
                 print("{:40} {!r}".format(path, val))
             else:
-                for entity in proxy.dir(path, bus=True):
+                for entity in proxy.dir(path, bus=args.bus):
                     walk(entity)
         except OwnetError as error:
             print('Unable to walk {}: server says {}'.format(path, error),

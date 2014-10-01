@@ -18,7 +18,7 @@
 #
 
 __all__ = ['__version__', 'proxy']
-__version__ = '0.8.0-beta.dev2'
+__version__ = '0.8.0-beta.dev3'
 
 
 class Error(Exception):
