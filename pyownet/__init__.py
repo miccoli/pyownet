@@ -18,11 +18,9 @@
 #
 
 __all__ = ['__version__', 'proxy']
-__version__ = '0.8.0-beta.dev3'
+__version__ = '0.8.0-beta.dev4'
 
 
 class Error(Exception):
     """Base class for all package errors"""
     pass
-
-from pyownet.protocol import proxy
