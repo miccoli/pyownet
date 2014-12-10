@@ -1,6 +1,6 @@
 from pyownet import __version__
 
-with open('README.txt') as file:
+with open('README.rst') as file:
     long_description = file.read()
 
 from distutils.core import setup
