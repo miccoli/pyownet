@@ -31,9 +31,8 @@ object whose methods correspond to ownet messages:
 Higher level modules will follow, providing OO access to sensors on the
 1-wire network.
 
-Python 3 is supported via ``2to3`` and ``build_py_2to3`` in
-``setup.py``; the result of the automatic conversion and should work
-without modifications.
+Python 3 is supported via ``2to3`` and ``use_2to3 = True`` in
+``setup.py``.
 
 .. _owserver: http://owfs.org/index.php?page=owserver_protocol
 .. _owserver network protocol: http://owfs.org/index.php?page=owserver-protocol
