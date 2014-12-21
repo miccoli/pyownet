@@ -17,4 +17,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__version__ = '0.7.3'
+__all__ = ['__version__', 'proxy']
+__version__ = '0.8.0-beta.dev3'
+
+
+class Error(Exception):
+    """Base class for all package errors"""
+    pass
+
+from pyownet.protocol import proxy

@@ -15,15 +15,8 @@ HOST = config.get('server', 'host')
 PORT = config.get('server', 'port')
 
 
-class TestProtocolModule(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        try:
-            cls.proxy = protocol.OwnetProxy(HOST, PORT)
-        except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+class _ProxyTestMix(object):
+    # mixin class for proxy object testing
 
     def test_ping(self):
         self.assertIsNone(self.proxy.ping())
@@ -50,6 +43,47 @@ class TestProtocolModule(unittest.TestCase):
         self.assertRaises(TypeError, self.proxy.dir, 1)
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
+
+
+class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.proxy = protocol.OwnetProxy(HOST, PORT)
+        except protocol.ConnError as exc:
+            raise RuntimeError('no owserver on %s:%s, got:%s' %
+                               (HOST, PORT, exc))
+
+
+class TestProtocol_proxy_factory(unittest.TestCase, _ProxyTestMix):
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.proxy = protocol.proxy(HOST, PORT)
+        except protocol.ConnError as exc:
+            raise RuntimeError('no owserver on %s:%s, got:%s' %
+                               (HOST, PORT, exc))
+
+
+class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.proxy = protocol.proxy(HOST, PORT, persistent=True, )
+        except protocol.ConnError as exc:
+            raise RuntimeError('no owserver on %s:%s, got:%s' %
+                               (HOST, PORT, exc))
+
+
+class TestProtocol_misc(unittest.TestCase):
+
+    def test_exceptions(self):
+        self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
+        self.assertRaises(TypeError, protocol.clone, 1)
+        pass
 
 if __name__ == '__main__':
     unittest.main()

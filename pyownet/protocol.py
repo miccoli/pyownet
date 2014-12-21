@@ -42,10 +42,16 @@ interactions with the server and is meant for internal use.
 
 from __future__ import print_function
 
+import warnings
 import struct
 import socket
 
+import pyownet
+
+# socket constants
 _MSG_WAITALL = socket.MSG_WAITALL
+_SOL_SOCKET = socket.SOL_SOCKET
+_SO_KEEPALIVE = socket.SO_KEEPALIVE
 
 if __debug__:
     import errno
@@ -94,7 +100,7 @@ MSK_PRESSURESCALE = 0x001C0000
 FLG_FORMAT_FDI =    0x00000000   # /10.67C6697351FF
 FLG_FORMAT_FI =     0x01000000   # /1067C6697351FF
 FLG_FORMAT_FDIDC =  0x02000000   # /10.67C6697351FF.8D
-FLG_FORMAT_FDIC  =  0x03000000   # /10.67C6697351FF8D
+FLG_FORMAT_FDIC =   0x03000000   # /10.67C6697351FF8D
 FLG_FORMAT_FIDC =   0x04000000   # /1067C6697351FF.8D
 FLG_FORMAT_FIC =    0x05000000   # /1067C6697351FF8D
 MSK_DEVFORMAT =     0xFF000000
@@ -111,11 +117,16 @@ _SCK_TIMEOUT = 2.0
 _MAX_PAYLOAD = 65536
 
 
+#
+# code /decode functions
+#
+
 def str2bytez(s):
     "transform string to zero-terminated bytes"
     if not isinstance(s, basestring):
         raise TypeError()
     return s.encode('ascii') + b'\x00'
+
 
 def bytes2str(b):
     "transform bytes to string"
@@ -128,7 +139,7 @@ def bytes2str(b):
 # exceptions
 #
 
-class Error(Exception):
+class Error(pyownet.Error):
     """Base class for all module errors"""
     pass
 
@@ -167,17 +178,26 @@ class OwnetError(Error, EnvironmentError):
 
 
 #
-# classes
+# supporting types (internal)
 #
 
 class _errtuple(tuple):
+    """tuple subtype for "error number" -> "error message" mapping
+
+    if error number is not defined returns a standard message"""
+
+    _message = ''
 
     def __getitem__(self, i):
         try:
             return super(_errtuple, self).__getitem__(i)
         except IndexError:
-            return '(unkown error)'
+            return self._message
 
+
+#
+# classes for message headers (internal)
+#
 
 class _addfieldprops(type):
     """metaclass for adding properties"""
@@ -242,8 +262,8 @@ class _Header(bytes):
 
     def __new__(cls, *args, **kwargs):
 
-        #if cls is _Header:
-        #    raise TypeError("_Header class may not be instantiated")
+        # if cls is _Header:
+        #     raise TypeError("_Header class may not be instantiated")
         msg, vals = cls._parse(*args, **kwargs)
         self = super(_Header, cls).__new__(cls, msg)
         self._vals = vals
@@ -266,6 +286,10 @@ class _FromServerHeader(_Header):
     _defaults = (0, 0, 0, FLG_OWNET, 0, 0)
 
 
+#
+# connection object
+#
+
 class OwnetConnection(object):
     """This class encapsulates a connection to an owserver"""
 
@@ -276,13 +300,22 @@ class OwnetConnection(object):
 
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
+        ## FIXME: is _SO_KEEPALIVE really useful?
+        self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
         self.socket.connect(sockaddr)
 
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
+    def __str__(self):
+        return "OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
+                                                   self.socket.getpeername())
+
     def shutdown(self):
         "shutdown connection"
+
+        if self.verbose:
+            print(self.socket.getsockname(), 'xx', self.socket.getpeername())
 
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -346,65 +379,36 @@ class OwnetConnection(object):
         return header, payload
 
 
-class OwnetProxy(object):
-    """Objects of this class define methods to query a given owserver"""
+#
+# proxy objects
+#
 
-    def __init__(self, host='localhost', port=4304, flags=0,
-                 verbose=False, ):
-        """return an ownet proxy object bound at (host, port); default is
-        (localhost, 4304).
+class _Proxy(object):
+    """Proxy object with methods to query an owserver,
+    socket connection is non persistent, stateless, thread-safe"""
 
-        'flags' are or-ed in the header of each query sent to owserver.
-        If verbose is True, details on each sent and received packet is
-        printed on stdout.
-        """
+    # no init logic, should be instatiated by a factory function
+    def __init__(self, family, address, flags=0,
+                 verbose=False, errmess=_errtuple(), ):
 
         # save init args
-        self._hostport = (host, port)
-        self.flags = flags | FLG_OWNET
+        self._family, self._sockaddr = family, address
+        self.flags = flags
         self.verbose = verbose
+        self.errmess = errmess
 
-        # default (empty) errcodes tuple
-        self.errmess = _errtuple()
+    def __str__(self):
+        return "ownet server at %s" % (self._sockaddr, )
 
-        #
-        # init logic:
-        # try to connect to the given owserver, send a MSG_NOP,
-        # and check answer
-        #
-
-        # resolve host name/port
-        try:
-            gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
-        except socket.gaierror as err:
-            raise ConnError(*err.args)
-
-        # gai is a list of tuples, search for the first working one
-        lasterr = None
-        for (self._family, _, _, _, self._sockaddr) in gai:
-            try:
-                self.ping()
-            except ConnError as err:
-                # not working, go over to next sockaddr
-                lasterr = err
-            else:
-                # ok, this is working, stop searching
-                break
-        else:
-            # no working (sockaddr, family) found: reraise last exception
-            assert isinstance(lasterr, ConnError)
-            raise lasterr
+    def _init_errcodes(self):
 
         # fetch errcodes array from owserver
         try:
             self.errmess = _errtuple(
                 m for m in bytes2str(self.read(PTH_ERRCODES)).split(','))
         except OwnetError:
-            # failed, leave the default empty errcodes defined above
+            # failed, leave the default empty errcodes
             pass
-
-    def __str__(self):
-        return "ownet server at %s" % (self._hostport, )
 
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(msgtype, payload)
@@ -485,3 +489,180 @@ class OwnetProxy(object):
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
+
+
+class _PersistentProxy(_Proxy):
+    """Proxy object with methods to query an owserver,
+    socket connection is persistent, statefull, not thread-safe"""
+
+    def __init__(self, family, address,
+                 flags=0, verbose=False, errmess=_errtuple(), ):
+
+        super(_PersistentProxy, self).__init__(
+            family, address, flags | FLG_PERSISTENCE, verbose, errmess)
+
+        self.conn = None
+        assert self.flags & FLG_PERSISTENCE
+
+    def __enter__(self):
+        if not self.conn:
+            self._open_connection()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close_connection()
+
+    def _open_connection(self):
+        assert self.conn is None
+        try:
+            self.conn = OwnetConnection(self._sockaddr,
+                                        self._family,
+                                        self.verbose)
+        except IOError as err:
+            raise ConnError(*err.args)
+
+    def close_connection(self):
+        if self.conn:
+            self.conn.shutdown()
+            self.conn = None
+        else:
+            assert self.conn is None
+
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+        """ retcode, data = sendmess(msgtype, payload)
+        send generic message and returns retcode, data
+        """
+
+        # ensure that there is an open connection
+        if not self.conn:
+            self._open_connection()
+        assert self.conn is not None
+
+        flags |= self.flags
+        try:
+            ret, rflags, data = self.conn.req(
+                msgtype, payload, flags, size, offset)
+        except IOError as err:
+            raise ConnError(*err.args)
+        # persistence not granted
+        if not (rflags & FLG_PERSISTENCE):
+            self.close_connection()
+
+        return ret, data
+
+
+class OwnetProxy(_Proxy):
+    """Objects of this class define methods to query a given owserver"""
+
+    def __init__(self, host='localhost', port=4304, flags=0,
+                 verbose=False, ):
+        """return an ownet proxy object bound at (host, port); default is
+        (localhost, 4304).
+
+        'flags' are or-ed in the header of each query sent to owserver.
+        If verbose is True, details on each sent and received packet is
+        printed on stdout.
+        """
+
+        # this class will be deprecated in version 0.9.x
+        warnings.warn(PendingDeprecationWarning("Please use pyownet.proxy()"))
+
+        # save init args
+        self.flags = flags | FLG_OWNET
+        self.verbose = verbose
+
+        # default (empty) errcodes tuple
+        self.errmess = _errtuple()
+
+        #
+        # init logic:
+        # try to connect to the given owserver, send a MSG_NOP,
+        # and check answer
+        #
+
+        # resolve host name/port
+        try:
+            gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        except socket.gaierror as err:
+            raise ConnError(*err.args)
+
+        # gai is a list of tuples, search for the first working one
+        lasterr = None
+        for (self._family, _, _, _, self._sockaddr) in gai:
+            try:
+                self.ping()
+            except ConnError as err:
+                # not working, go over to next sockaddr
+                lasterr = err
+            else:
+                # ok, this is working, stop searching
+                break
+        else:
+            # no working (sockaddr, family) found: reraise last exception
+            assert isinstance(lasterr, ConnError)
+            raise lasterr
+
+        # fetch errcodes array from owserver
+        try:
+            self.errmess = _errtuple(
+                m for m in bytes2str(self.read(PTH_ERRCODES)).split(','))
+        except OwnetError:
+            # failed, leave the default empty errcodes defined above
+            pass
+
+
+#
+# factory functions
+#
+
+def proxy(host='localhost', port=4304, flags=0, persistent=False,
+          verbose=False, ):
+    """factory function that returns a proxy object for an owserver at
+       host, port. """
+
+    if persistent:
+        pclass = _PersistentProxy
+    else:
+        pclass = _Proxy
+
+    # resolve host name/port
+    try:
+        gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    except socket.gaierror as err:
+        raise ConnError(*err.args)
+
+    # gai is a list of tuples, search for the first working one
+    lasterr = None
+    for (family, _, _, _, sockaddr) in gai:
+        try:
+            owp = pclass(family, sockaddr, flags, verbose)
+            owp.ping()
+        except ConnError as err:
+            # not working, go over to next sockaddr
+            lasterr = err
+            # fixme: should release owp resources?
+        else:
+            # ok, this is working, stop searching
+            break
+    else:
+        # no working (sockaddr, family) found: reraise last exception
+        assert isinstance(lasterr, ConnError)
+        raise lasterr
+
+    # fixme: should this be only optional?
+    owp._init_errcodes()
+
+    return owp
+
+
+def clone(proxy, persistent=True):
+
+    if persistent:
+        pclass = _PersistentProxy
+    else:
+        pclass = _Proxy
+
+    if not isinstance(proxy, _Proxy):
+        raise TypeError('argument is not a Proxy object')
+    return pclass(proxy._family, proxy._sockaddr,
+                  proxy.flags, proxy.verbose, proxy.errmess)
