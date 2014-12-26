@@ -19,7 +19,7 @@ object whose methods correspond to ownet messages:
 
 ::
 
-    >>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
+    >>> owproxy = pyownet.protocol.proxy(host="owserver.example.com", port=4304)
     >>> owproxy.ping()
     >>> owproxy.dir()
     ['/10.67C6697351FF/', '/05.4AEC29CDBAAB/']
@@ -27,9 +27,6 @@ object whose methods correspond to ownet messages:
     True
     >>> owproxy.read('/10.67C6697351FF/temperature')
     '     91.6195'
-
-Higher level modules will follow, providing OO access to sensors on the
-1-wire network.
 
 Python 3 is supported via ``2to3`` and ``use_2to3 = True`` in
 ``setup.py``.
