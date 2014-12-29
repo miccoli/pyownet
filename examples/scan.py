@@ -1,11 +1,20 @@
+"""scan.py -- scan the owserver given on the command line
+
+scan.py [server[:port]] ...
+
+print some info on the sensors on owserver at 'server:port'
+default is 'localhost:4304'
+
+"""
 from __future__ import print_function
 
 import sys
 
-from pyownet.protocol import (OwnetProxy, ConnError, ProtocolError, OwnetError)
+from pyownet import protocol
 
 
 def main():
+
     if len(sys.argv) >= 2:
         args = sys.argv[1:]
     else:
@@ -17,8 +26,8 @@ def main():
         except ValueError:
             host, port = netloc, 4304
         try:
-            proxy = OwnetProxy(host, port)
-        except (ConnError, ProtocolError) as err:
+            proxy = protocol.proxy(host, port)
+        except (protocol.ConnError, protocol.ProtocolError) as err:
             print(err)
             continue
         pid = None
@@ -26,7 +35,7 @@ def main():
         try:
             pid = int(proxy.read('/system/process/pid'))
             ver = proxy.read('/system/configuration/version').decode()
-        except OwnetError:
+        except protocol.OwnetError:
             pass
         print('{0}, pid = {1:d}, ver = {2}'.format(proxy, pid, ver))
         print('{0:^17} {1:^7} {2:>7}'.format('id', 'type', 'temp.'))
@@ -35,7 +44,7 @@ def main():
             try:
                 temp = float(proxy.read(sensor + '/temperature'))
                 temp = "{0:.2f}".format(temp)
-            except OwnetError:
+            except protocol.OwnetError:
                 temp = ''
             print('{0:<17} {1:<7} {2:>7}'.format(sensor, stype, temp))
 

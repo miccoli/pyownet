@@ -17,8 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['__version__', 'proxy']
-__version__ = '0.8.0c1'
+__all__ = ['__version__', ]
+__version__ = '0.8.0rc2'
 
 
 class Error(Exception):
