@@ -32,7 +32,9 @@ nosetests.xml
 *.mo
 
 # docs/sphinx
-_build/
+/docs/_build/
+/docs/_static/
+/docs/_templates/
 
 # emacs backup files
 *~
