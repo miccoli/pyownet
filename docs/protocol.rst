@@ -26,7 +26,7 @@ Persistent vs. non persistent proxy objects.
 
 The owserver protocol presents two variants: *non persistent*
 connection and *persistent* connection. In a *non persistent*
-connection a network sockect is bound and torn down for each
+connection a network socket is bound and torn down for each
 client-server message exchange; the protocol is stateless. For a
 *persistent* connection the same socket is reused for subsequent
 client-server interactions and the socket has to be torn down only
@@ -35,7 +35,7 @@ persistent connection is granted by the server: if the server is not
 willing to grant a persistent connection, the protocol requires a
 fall-back towards a non persistent connection.
 
-Corrispondingly two different proxy object classes are implemented:
+Correspondingly two different proxy object classes are implemented:
 *non-persistent* and *persistent*.
 
 * *Non-persistent* proxy objects are thread-safe, in the sense that
@@ -45,16 +45,16 @@ Corrispondingly two different proxy object classes are implemented:
 
 * *Persistent* proxy objects are not thread safe, in the sense that
   the same object cannot be used concurrently by different threads. If
-  multihread use is desired, it is responsability of the user to
+  multithread use is desired, it is responsibility of the user to
   implement a proper locking mechanism.  On the first call to a
   method, a socket is bound to the owserver and kept open for reuse in
   the subsequent calls. It is responsibility of the user to explicitly
   close the connection at the end of a session.
 
 In general, if performance is not an issue, it is safer to use
-non-persistent connection proxies: the protocol is simplier to manage,
+non-persistent connection proxies: the protocol is simpler to manage,
 and usually the cost of creating a socket for each message is
-negligible with respect to the 1-wire network repsonse times.
+negligible with respect to the 1-wire network response times.
 
 
 Functions
@@ -65,7 +65,7 @@ Functions
 
    :param str host: host to contact
    :param int port: tcp port number to connect with
-   :param int flags: protocol flag word to be ored to each outgoing
+   :param int flags: protocol flag word to be ORed to each outgoing
 		     message (see :ref:`flags`).
    :param bool persistent: whether the requested connection is
 			   persistent or not.
@@ -80,13 +80,13 @@ Functions
 .. py:function:: clone(proxy, persistent=True)
 
    :param proxy: existing proxy object
-   :param bool persistent: wheter the new proxy object is persistent
+   :param bool persistent: whether the new proxy object is persistent
 			   or not
    :return: new proxy object
 
    There are costs involved in creating proxy objects (DNS lookups
    etc.). Therefore the same proxy object should be saved and reused
-   in different parts of the program. The main pourpose of this
+   in different parts of the program. The main purpose of this
    functions is to quickly create a new proxy object with the same
    properties of the old one, with only the persistence parameter
    changed. Typically this can be useful if one desires to use
@@ -130,7 +130,7 @@ Proxy objects are returned by the factory functions :func:`proxy` and
 proxied server and return it's response, if any. They exists in two
 versions: non persistent :class:`_Proxy` instances and persistent
 :class:`_PersistentProxy` instances. The corresponding classes should
-not be instatiated directly by the user, but only by the factory
+not be instantiated directly by the user, but only by the factory
 functions.
 
 .. py:class:: _Proxy
@@ -145,8 +145,8 @@ functions.
    .. py:method:: ping()
 
       sends a *ping* message to owserver and returns ``None``. This is
-      actualy a no-op, and no response is expected; this method could
-      be used for veirfying that a given server is accepting
+      actually a no-op, and no response is expected; this method could
+      be used for verifying that a given server is accepting
       connections.
 
    .. py:method:: present(path)
@@ -178,7 +178,7 @@ functions.
 	>>> p.read('/01.98542F112D05/type')
 	'DS2401'
 
-      The ``size`` parameters can be specified to limit the maximun
+      The ``size`` parameters can be specified to limit the maximum
       length of the data buffer returned. (Note that specifying this
       parameter to a value less than the *natural* size of the payload
       will result in a partial read: there is no way to resume the
@@ -267,9 +267,10 @@ functions.
 	 ...
 
    In the above example, outside of the ``with`` blocks all socket
-   connections to the owserver are closed. Moreover the socket
-   connection is opened when entering the block, even before the first
-   call to a method, which could be useful for error handling.
+   connections to the owserver are guaranteed to be closed. Moreover
+   the socket connection is opened when entering the block, even
+   before the first call to a method, which could be useful for error
+   handling.
 
 
 Constants
@@ -306,7 +307,7 @@ Flags
 
 The module defines a number of constants, to be passed as the ``flags``
 argument to :func:`proxy`. If more flags should apply, these have to
-be ORed togheter: e.g. for reading temperatures in Kelvin and
+be ORed together: e.g. for reading temperatures in Kelvin and
 pressures in Pascal, one should call::
 
    owproxy = protocol.proxy(flags=FLG_TEMP_K | FLG_PRESS_PA)

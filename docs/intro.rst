@@ -1,36 +1,20 @@
-Introduction to OWFS and the owserver protocol
-==============================================
+Introduction
+============
 
-1-Wire® is a a single contact serial interface developped by Maxim
+pyownet is a pure Python package for interfacing to a 1-Wire
+network via OWFS. A brief introduction to the main components with
+which pyownet interacts is given below.
+
+1-Wire
+------
+
+1-Wire® is a a single contact serial interface developed by Maxim
 Integrated™. A typical 1-Wire network is composed by a master device
 and a collection of slave devices/sensors. The master device is
 usually connected to a host computer via a serial or USB interface,
 but there exist also ethernet or other network adapters.
 
-The "1-Wire File System", in short OWFS, is a software system that
-allows to access a 1-Wire bus via a supported master device. OWFS
-comprises many different modules which offer different access
-protocols to 1-Wire data: ``owhttpd`` (http), ``owftpd`` (ftp) and
-``owfs`` (filesystem interface via FUSE). Since only a single program
-can access the 1-Wire bus at one time, there is also backend
-component, ``owserver``, that arbitrates access to the bus from
-multiple client processes. Client processes can query an ``owserver``
-(the program) via network sockets, typically 4304/tcp, speaking the
-'owserver' protocol. OWFS offers many language bindings for writing
-owserver clients: among others c, java, perl, php, python, which can
-be found in its source tree under the ``module/ownet`` directory.
-
-``pyownet`` it's a pure python implementation of the client side of
-the owserver protocol. The main difference with the official OWFS
-module ``ownet`` (to be found in ``module/ownet/python``) is an
-oo-design that allows to query in a thread-safe way more than one
-``owserver`` server at a time. Moreover Python 3 is fully supported
-via ``2to3``.
-
 .. seealso::
-
-   `OWFS 1-Wire File System - development site <http://owfs.org/>`_
-       official OWFS site
 
    `1-Wire Maxim`_
        1-Wire technology brief from Maxim Integrated
@@ -42,16 +26,40 @@ via ``2to3``.
        description of the 1-Wire bus system on Wikipedia
 
 
+OWFS and the owserver protocol
+------------------------------
+
+The "1-Wire File System", in short OWFS, is a software system that
+allows to access a 1-Wire bus via a supported master device. OWFS
+comprises many different modules which offer different access
+protocols to 1-Wire data: ``owhttpd`` (http), ``owftpd`` (ftp) and
+``owfs`` (filesystem interface via FUSE). Since only a single program
+can access the 1-Wire bus at one time, there is also backend
+component, ``owserver``, that arbitrates access to the bus from
+multiple client processes. Client processes can query an ``owserver``
+(the program) via network sockets speaking the 'owserver'
+protocol. OWFS offers many language bindings for writing owserver
+clients: among others c, java, perl, php, python, which can be found
+in the OWFS source tree under the `module/ownet`_ directory.
+
+.. _module/ownet:
+   http://sourceforge.net/p/owfs/code/ci/master/tree/module/ownet/
+
+.. seealso::
+
+   `OWFS 1-Wire File System - development site <http://owfs.org/>`_
+       official OWFS site
+
 
 owserver protocol brief
------------------------
+.......................
 
 The owserver protocol follows a client-server paradigm: the client
 makes a connection to the listening socket of the ``owserver`` program
 and sends a message. The server replies with another message, and then
 either closes the connection or waits for other messages [#pers]_. The
 default port 4304/tcp (and 4304/udp, although UDP is not used) is
-`registered at the IANA`_ as *owserver* service for this pourpose.
+`registered at the IANA`_ as *owserver* service for this purpose.
 
 .. _registered at the IANA:
    https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=4304#table-service-names-port-numbers
@@ -105,6 +113,26 @@ stream of bytes (of length ``server_msg.payload`` or
    .. _owserver network protocol:
        http://owfs.org/index.php?page=owserver-protocol
 
+
+:py:mod:`pyownet` package contents
+----------------------------------
+
+To time :py:mod:`pyownet` comprises a single module
+:py:mod:`pyownet.protocol`, which is a low-level implementation of the
+client side of the owserver protocol. It can be considered a
+replacement of the official OWFS module :py:mod:`ownet.connection` (to
+be found in `module/ownet/python`_).
+
+.. _module/ownet/python:
+   http://sourceforge.net/p/owfs/code/ci/master/tree/module/ownet/python/
+
+
+
+
+Although low-level, it's use is fairly simple, due
+to the peculiar OWFS design, with it's file-system like structure.
+
+A higher-level module :py:mod:`pyownet.sensors` is under development.
 
 .. rubric:: Footnotes
 
