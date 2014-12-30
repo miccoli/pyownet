@@ -1,9 +1,9 @@
 pyownet, a pythonic interface to ownet
 ======================================
 
-| docs |
+|docs|
 
-.. | docs | image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
+.. |docs| image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
    :target: https://readthedocs.org/projects/pyownet/?badge=latest
    :alt: Documentation Status
 
