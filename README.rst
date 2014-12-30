@@ -4,8 +4,8 @@ pyownet, a pythonic interface to ownet
 |docs|
 
 .. |docs| image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
-   :target: https://readthedocs.org/projects/pyownet/?badge=latest
-   :alt: Documentation Status
+   :target: http://pyownet.readthedocs.org/en/latest/
+   :alt: Package Documentation
 
 pyownet is a pure python package that allows to access an `owserver`_
 via the `owserver network protocol`_, in short *ownet*.
