@@ -26,8 +26,12 @@ Caution:
 
 from __future__ import print_function
 
+import sys
 import argparse
-from urlparse import urlsplit
+if sys.version_info[0] < 3:
+    from urlparse import urlsplit
+else:
+    from urllib.parse import urlsplit
 import collections
 from binascii import hexlify
 

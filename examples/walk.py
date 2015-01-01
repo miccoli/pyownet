@@ -24,7 +24,10 @@ from __future__ import print_function
 
 import sys
 import argparse
-from urlparse import urlsplit
+if sys.version_info[0] < 3:
+    from urlparse import urlsplit
+else:
+    from urllib.parse import urlsplit
 import collections
 
 from pyownet import protocol
@@ -117,7 +120,8 @@ def main():
         except protocol.ConnError as error:
             print('Unable to walk {}: {}'.format(path, error), file=sys.stderr)
 
-    walk(urlc.path)
+    with proxy:
+        walk(urlc.path)
 
 if __name__ == '__main__':
     main()
