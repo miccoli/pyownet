@@ -3,7 +3,13 @@ from __future__ import print_function
 import atexit
 import time
 import threading
-from ConfigParser import ConfigParser
+import os
+import sys
+
+if sys.version_info[0] < 3:
+    from ConfigParser import ConfigParser
+else:
+    from configparser import ConfigParser
 
 from pyownet import protocol
 
@@ -14,7 +20,7 @@ config.add_section('server')
 config.set('server', 'host', 'localhost')
 config.set('server', 'port', '4304')
 
-config.read(['tests.ini'])
+config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
 
 HOST = config.get('server', 'host')
 PORT = config.get('server', 'port')
@@ -26,7 +32,7 @@ def log(s):
     print(tst(), s)
 
 def main():
-    proxy = protocol.proxy(HOST, PORT, verbose=True)
+    proxy = protocol.proxy(HOST, PORT, verbose=False)
     pid = ver = ''
     try:
         pid = int(proxy.read('/system/process/pid'))

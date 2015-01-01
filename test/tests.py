@@ -1,9 +1,11 @@
 import unittest
+import sys
+import os
 from pyownet import protocol
 
-try:
+if sys.version_info[0] < 3:
     from ConfigParser import ConfigParser
-except ImportError:
+else:
     from configparser import ConfigParser
 
 config = ConfigParser()
@@ -12,7 +14,7 @@ config.add_section('server')
 config.set('server', 'host', 'localhost')
 config.set('server', 'port', '4304')
 
-config.read(['tests.ini'])
+config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
 
 HOST = config.get('server', 'host')
 PORT = config.get('server', 'port')
