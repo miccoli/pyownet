@@ -30,3 +30,11 @@ nosetests.xml
 
 # Translations
 *.mo
+
+# docs/sphinx
+/docs/_build/
+/docs/_static/
+/docs/_templates/
+
+# emacs backup files
+*~

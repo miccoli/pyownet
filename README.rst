@@ -1,6 +1,12 @@
 pyownet, a pythonic interface to ownet
 ======================================
 
+|docs|
+
+.. |docs| image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
+   :target: http://pyownet.readthedocs.org/en/latest/
+   :alt: Package Documentation
+
 pyownet is a pure python package that allows to access an `owserver`_
 via the `owserver network protocol`_, in short *ownet*.
 
@@ -19,7 +25,7 @@ object whose methods correspond to ownet messages:
 
 ::
 
-    >>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
+    >>> owproxy = pyownet.protocol.proxy(host="owserver.example.com", port=4304)
     >>> owproxy.ping()
     >>> owproxy.dir()
     ['/10.67C6697351FF/', '/05.4AEC29CDBAAB/']
@@ -28,6 +34,8 @@ object whose methods correspond to ownet messages:
     >>> owproxy.read('/10.67C6697351FF/temperature')
     '     91.6195'
 
+Python 3 is supported via ``2to3`` and ``use_2to3 = True`` in
+``setup.py``.
 
 .. _owserver: http://owfs.org/index.php?page=owserver_protocol
 .. _owserver network protocol: http://owfs.org/index.php?page=owserver-protocol

@@ -17,4 +17,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__version__ = 'devs2'
+__all__ = ['__version__', ]
+__version__ = '0.9.0.dev3'
+
+
+class Error(Exception):
+    """Base class for all package errors"""
+    pass

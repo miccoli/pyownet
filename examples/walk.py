@@ -1,22 +1,18 @@
-"""owget.py -- a pyownet implementation of owget
-
-This small example shows how to implement a work-a-like of owget
-(which is a C program in module owshell from owfs).
+"""walk.py -- a pyownet implementation of owget
 
 This implementation is for python 2.X
 
 This programs parses an owserver URI, constructed in the obvious way:
-'owserver://hostname:port/path' and prints the corresponding state.
-If 'path' ends with a slash a DIR operation is executed, otherwise a READ.
+'owserver://hostname:port/path' and prints all nodes reachable below it.
 
 The URI scheme 'owserver:' is optional. For 'hostname:port' the default
 is 'localhost:4304'
 
 Usage examples:
 
-python owget.py //localhost:14304/
-python owget.py //localhost:14304/26.000026D90200/
-python owget.py -K //localhost:14304/26.000026D90200/temperature
+python walk.py //localhost:14304/
+python walk.py //localhost:14304/26.000026D90200/
+python walk.py -K //localhost:14304/26.000026D90200/temperature
 
 Caution:
 'owget.py //localhost:14304/26.000026D90200' or
@@ -33,7 +29,6 @@ if sys.version_info[0] < 3:
 else:
     from urllib.parse import urlsplit
 import collections
-from binascii import hexlify
 
 from pyownet import protocol
 
@@ -80,10 +75,9 @@ def main():
     parser.add_argument('-f', '--format', choices=fcodes,
                         help='format for 1-wire unique serial IDs display')
 
-    # optional arg for output format
-    parser.add_argument('--hex', action='store_true',
-                        help='write read data in hex format')
-
+    parser.add_argument('--nosys', '--only-sensors',
+                        action='store_false', dest='bus',
+                        help='do not descend system directories')
     #
     # parse command line args
     #
@@ -106,22 +100,28 @@ def main():
     # create owserver proxy object
     #
     try:
-        owproxy = protocol.proxy(
-            host, port, flags=args.t_flags | fcodes[args.format], )
+        proxy = protocol.proxy(
+            host, port, flags=args.t_flags | fcodes[args.format],
+            persistent=True)
     except (protocol.ConnError, protocol.ProtocolError) as error:
         parser.exit(status=1, message=str(error)+'\n')
 
-    try:
-        if urlc.path.endswith('/'):
-            for entity in owproxy.dir(urlc.path, bus=True):
-                print(entity)
-        else:
-            data = owproxy.read(urlc.path)
-            if args.hex:
-                data = hexlify(data)
-            print(data, end='')
-    except protocol.OwnetError as error:
-        parser.exit(status=1, message=str(error)+'\n')
+    def walk(path):
+        try:
+            if not path.endswith('/'):
+                val = proxy.read(path)
+                print("{:40} {!r}".format(path, val))
+            else:
+                for entity in proxy.dir(path, bus=args.bus):
+                    walk(entity)
+        except protocol.OwnetError as error:
+            print('Unable to walk {}: server says {}'.format(path, error),
+                  file=sys.stderr)
+        except protocol.ConnError as error:
+            print('Unable to walk {}: {}'.format(path, error), file=sys.stderr)
+
+    with proxy:
+        walk(urlc.path)
 
 if __name__ == '__main__':
     main()

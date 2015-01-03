@@ -1,6 +1,14 @@
 
-document that every pathname has to by an ASCIIZ string in the wire
+document that every pathname has to by an ASCIIZ string on the wire
+in older owlib versions
 
 FLG_ALIAS is apparently not working
 
 on the dir() reply offset field seems to code some info (?)
+
+-----
+
+close sockets on proxy object delete:
+ *) conn error
+ *) del of persistent connection
+check ResourceWarning in python3
