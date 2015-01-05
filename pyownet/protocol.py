@@ -351,9 +351,25 @@ class OwnetConnection(object):
             raise ShortWrite()
         assert sent == len(header + payload), sent
 
+    def _read_raw(self, size):
+        """read size bytes from self.socket"""
+
+        # was:
+        #   return self.socket.recv(size, _MSG_WAITALL)
+        # but proved not reliable
+
+        buf = memoryview(bytearray(size))
+        pt = 0
+        while pt < size:
+            nread = self.socket.recv_into(buf[pt:])
+            if nread == 0:
+                break
+            pt += nread
+        return buf.tobytes()
+
     def _read_msg(self):
         "read message from server"
-        header = self.socket.recv(_FromServerHeader.header_size, _MSG_WAITALL)
+        header = self._read_raw(_FromServerHeader.header_size)
         if len(header) < _FromServerHeader.header_size:
             raise ShortRead("short header, got {0!r}".format(header))
         assert(len(header) == _FromServerHeader.header_size)
@@ -365,7 +381,7 @@ class OwnetConnection(object):
         if header.payload > _MAX_PAYLOAD:
             raise MalformedHeader('huge payload, unwilling to read', header)
         if header.payload > 0:
-            payload = self.socket.recv(header.payload, _MSG_WAITALL)
+            payload = self._read_raw(header.payload)
             if len(payload) < header.payload:
                 raise ShortRead(
                     "short payload, got {0:d} bytes "
