@@ -3,7 +3,10 @@ import sys
 import os
 from pyownet import protocol
 
-if sys.version_info[0] < 3:
+if sys.version_info < (2, 7, ):
+    raise NotImplementedError(
+        'Unit testing not implemented for this python version')
+elif sys.version_info < (3, ):
     from ConfigParser import ConfigParser
 else:
     from configparser import ConfigParser
