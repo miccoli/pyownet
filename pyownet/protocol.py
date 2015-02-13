@@ -352,8 +352,8 @@ class OwnetConnection(object):
             raise ShortWrite()
         assert sent == len(header + payload), sent
 
-    if sys.version_info < (2, 7, ):
-        # python 2.6 support, will be deprecated in the future
+    if sys.version_info < (2, 7, 6, ):
+        # legacy python support, will be deprecated in the future
 
         def _read_socket(self, nbytes):
             """read nbytes bytes from self.socket"""
