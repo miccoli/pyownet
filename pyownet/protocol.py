@@ -24,7 +24,7 @@ interactions with the server and is meant for internal use.
 """
 
 #
-# Copyright 2013, 2014 Stefano Miccoli
+# Copyright 2013-2015 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,7 +50,6 @@ import socket
 import pyownet
 
 # socket constants
-_MSG_WAITALL = socket.MSG_WAITALL
 _SOL_SOCKET = socket.SOL_SOCKET
 _SO_KEEPALIVE = socket.SO_KEEPALIVE
 
@@ -364,8 +363,8 @@ class OwnetConnection(object):
                 if len(tmp) == 0:
                     if self.verbose:
                         print('ee', repr(buf))
-                    raise ShortRead(
-                            "still %d bytes to read" % (nbytes - len(buf), ))
+                    raise ShortRead("short read: read %d bytes instead of %d"
+                                    % (len(buf), nbytes, ))
                 buf += tmp
             return buf
 
@@ -375,9 +374,8 @@ class OwnetConnection(object):
         def _read_socket(self, nbytes):
             """read nbytes bytes from self.socket"""
 
-            # was:
-            #   return self.socket.recv(nbytes, _MSG_WAITALL)
-            # but proved not reliable
+            # was 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
+            # but implementation proved not reliable
 
             buf = bytearray(nbytes)
             view = memoryview(buf)
@@ -386,7 +384,8 @@ class OwnetConnection(object):
                 if nread == 0:
                     if self.verbose:
                         print('ee', repr(buf[:-nbytes]))
-                    raise ShortRead("still %d bytes to read" % nbytes)
+                    raise ShortRead("short read: read %d bytes instead of %d"
+                                    % (len(view) - nbytes, len(view), ))
                 nbytes -= nread
             return buf
 
