@@ -53,8 +53,8 @@ class Properties(object):
 
     def __init__(self, record):
 
-        if not isinstance(record, bytes):
-            raise TypeError('record must be bytes')
+        if not isinstance(record, (bytes, bytearray, )):
+            raise TypeError('record must be binary')
         record = record.decode()
         flds = record.split(',')
         if len(flds) < 7:

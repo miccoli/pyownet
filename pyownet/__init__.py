@@ -1,7 +1,7 @@
 """python ownet client"""
 
 #
-# Copyright 2013, 2014 Stefano Miccoli
+# Copyright 2013-2015 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #
 
 __all__ = ['__version__', ]
-__version__ = '0.9.0.dev3'
+__version__ = '0.9.0dev4'
 
 
 class Error(Exception):

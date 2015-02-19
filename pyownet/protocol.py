@@ -24,7 +24,7 @@ interactions with the server and is meant for internal use.
 """
 
 #
-# Copyright 2013, 2014 Stefano Miccoli
+# Copyright 2013-2015 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,6 +42,7 @@ interactions with the server and is meant for internal use.
 
 from __future__ import print_function
 
+import sys
 import warnings
 import struct
 import socket
@@ -49,7 +50,6 @@ import socket
 import pyownet
 
 # socket constants
-_MSG_WAITALL = socket.MSG_WAITALL
 _SOL_SOCKET = socket.SOL_SOCKET
 _SO_KEEPALIVE = socket.SO_KEEPALIVE
 
@@ -118,7 +118,7 @@ _MAX_PAYLOAD = 65536
 
 
 #
-# code /decode functions
+# code/decode functions
 #
 
 def str2bytez(s):
@@ -130,7 +130,7 @@ def str2bytez(s):
 
 def bytes2str(b):
     "transform bytes to string"
-    if not isinstance(b, bytes):
+    if not isinstance(b, (bytes, bytearray, )):
         raise TypeError()
     return b.decode('ascii')
 
@@ -240,7 +240,7 @@ class _Header(bytes):
             # FIXME check for args type and semantics
             assert len(args) == 1
             assert not kwargs
-            assert isinstance(msg, bytes)
+            assert isinstance(msg, (bytes, bytearray, ))
             assert len(msg) == cls.header_size
             #
             vals = cls._struct.unpack(msg)
@@ -250,7 +250,7 @@ class _Header(bytes):
                 raise TypeError("constructor got unexpected keyword argument"
                                 " '%s'" % kwargs.popitem()[0])
             msg = cls._struct.pack(*vals)
-        assert isinstance(msg, bytes)
+        assert isinstance(msg, (bytes, bytearray, ))
         assert isinstance(vals, tuple)
         return msg, vals
 
@@ -351,25 +351,60 @@ class OwnetConnection(object):
             raise ShortWrite()
         assert sent == len(header + payload), sent
 
+    if sys.version_info < (2, 7, 6, ):
+        # legacy python support, will be deprecated in the future
+
+        def _read_socket(self, nbytes):
+            """read nbytes bytes from self.socket"""
+
+            buf = ''
+            while len(buf) < nbytes:
+                tmp = self.socket.recv(nbytes)
+                if len(tmp) == 0:
+                    if self.verbose:
+                        print('ee', repr(buf))
+                    raise ShortRead("short read: read %d bytes instead of %d"
+                                    % (len(buf), nbytes, ))
+                buf += tmp
+            return buf
+
+    else:
+        # python 2.7 and 3.x
+
+        def _read_socket(self, nbytes):
+            """read nbytes bytes from self.socket"""
+
+            # was 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
+            # but implementation proved not reliable
+
+            buf = bytearray(nbytes)
+            view = memoryview(buf)
+            while nbytes:
+                nread = self.socket.recv_into(view[-nbytes:])
+                if nread == 0:
+                    if self.verbose:
+                        print('ee', repr(buf[:-nbytes]))
+                    raise ShortRead("short read: read %d bytes instead of %d"
+                                    % (len(view) - nbytes, len(view), ))
+                nbytes -= nread
+            return buf
+
     def _read_msg(self):
         "read message from server"
-        header = self.socket.recv(_FromServerHeader.header_size, _MSG_WAITALL)
-        if len(header) < _FromServerHeader.header_size:
-            raise ShortRead("short header, got {0!r}".format(header))
-        assert(len(header) == _FromServerHeader.header_size)
-        header = _FromServerHeader(header)
+
+        header = _FromServerHeader(
+                    self._read_socket(_FromServerHeader.header_size))
         if self.verbose:
             print('<-', repr(header))
+
+        # error conditions
         if header.version != 0:
             raise MalformedHeader('bad version', header)
         if header.payload > _MAX_PAYLOAD:
             raise MalformedHeader('huge payload, unwilling to read', header)
+
         if header.payload > 0:
-            payload = self.socket.recv(header.payload, _MSG_WAITALL)
-            if len(payload) < header.payload:
-                raise ShortRead(
-                    "short payload, got {0:d} bytes "
-                    "instead of {1:d}".format(len(payload), header.payload))
+            payload = self._read_socket(header.payload)
             if self.verbose:
                 print('..', repr(payload))
             assert header.size <= header.payload

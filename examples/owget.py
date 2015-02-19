@@ -28,7 +28,7 @@ from __future__ import print_function
 
 import sys
 import argparse
-if sys.version_info[0] < 3:
+if sys.version_info < (3, ):
     from urlparse import urlsplit
 else:
     from urllib.parse import urlsplit

@@ -6,7 +6,7 @@ import threading
 import os
 import sys
 
-if sys.version_info[0] < 3:
+if sys.version_info < (3, ):
     from ConfigParser import ConfigParser
 else:
     from configparser import ConfigParser
