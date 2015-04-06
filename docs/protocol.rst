@@ -5,6 +5,12 @@
 .. py:module:: pyownet.protocol
    :synopsis: low level interface to owserver protocol
 
+.. warning::
+
+   This software is still in alpha testing. Altough it has been
+   sucessfully used in production environments for more than 4 years,
+   its API is not frozen yet, and could be changed.
+
 The :mod:`pyownet.protocol` module is a low-level implementation of
 the client side of the owserver protocol. Interaction with an owserver
 takes place via a proxy object whose methods correspond to ownet
@@ -169,7 +175,7 @@ functions.
       trailing slash. If ``bus=True`` also special directories (like
       ``/settings/``, ``/structure/``, ``/uncached/``) are listed.
 
-   .. py:method:: read(path[, size])
+   .. py:method:: read(path, size=MAX_PAYLOAD, offset=0)
 
       returns the data read from node at path, which has not to be a
       directory. ::
@@ -179,17 +185,18 @@ functions.
 	'DS2401'
 
       The ``size`` parameters can be specified to limit the maximum
-      length of the data buffer returned. (Note that specifying this
-      parameter to a value less than the *natural* size of the payload
-      will result in a partial read: there is no way to resume the
-      command and read the remaining data.)
+      length of the data buffer returned; when ``offset > 0`` the
+      first ``offset`` bytes are skipped. (In python slice notation,
+      if ``data = read(path)``, then ``read(path, size, offset)``
+      returns ``data[offset:offset+size]``.)
 
-   .. py:method:: write(path, data)
+   .. py:method:: write(path, data, offset=0)
 
-      writes binary ``data`` to node at path. ::
+      writes binary ``data`` to node at path; when ``offset > 0`` data
+      is written starting at byte offset ``offset`` in ``path``. ::
 
 	>>> p = protocol.proxy()
-	>>> p.write('01.98542F112D05/alias', 'aaa')
+	>>> p.write('01.98542F112D05/alias', b'aaa')
 
    .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0)
 
@@ -275,6 +282,13 @@ functions.
 
 Constants
 ---------
+
+.. py:data:: MAX_PAYLOAD
+
+Defines the maximum number of bytes that this module is willing to
+read in a single message from the remote owserver. This limit is
+enforced to avoid security problems with malformed headers. The limit
+is hardcoded to 65536 bytes. [#alpha]_
 
 .. _msgtypes:
 
@@ -383,3 +397,7 @@ I       device serial number (6 bytes) as hex string
 C       Dallas Semiconductor 1-Wire CRC (1 byte) as hex string
 D       a single dot character '.'
 ======  ======================================================
+
+.. rubric:: Footnotes
+
+.. [#alpha] Subject to change while package is in alpha phase.

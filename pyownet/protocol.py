@@ -114,7 +114,7 @@ PTH_ERRCODES = '/settings/return_codes/text.ALL'
 # socket timeout (s)
 _SCK_TIMEOUT = 2.0
 # do not attempt to read messages bigger than this (bytes)
-_MAX_PAYLOAD = 65536
+MAX_PAYLOAD = 65536
 
 
 #
@@ -369,7 +369,7 @@ class OwnetConnection(object):
             return buf
 
     else:
-        # python 2.7 and 3.x
+        # python >= 2.7.6 and 3.x
 
         def _read_socket(self, nbytes):
             """read nbytes bytes from self.socket"""
@@ -400,7 +400,7 @@ class OwnetConnection(object):
         # error conditions
         if header.version != 0:
             raise MalformedHeader('bad version', header)
-        if header.payload > _MAX_PAYLOAD:
+        if header.payload > MAX_PAYLOAD:
             raise MalformedHeader('huge payload, unwilling to read', header)
 
         if header.payload > 0:
@@ -497,18 +497,19 @@ class _Proxy(object):
         else:
             return []
 
-    def read(self, path, size=_MAX_PAYLOAD):
+    def read(self, path, size=MAX_PAYLOAD, offset=0):
         "read data at path"
 
-        if size > _MAX_PAYLOAD:
-            raise ValueError("size cannot exceed < %d" % _MAX_PAYLOAD)
+        if size > MAX_PAYLOAD:
+            raise ValueError("size cannot exceed %d" % MAX_PAYLOAD)
 
-        ret, data = self.sendmess(MSG_READ, str2bytez(path), size=size)
+        ret, data = self.sendmess(MSG_READ, str2bytez(path),
+                                  size=size, offset=offset, )
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         return data
 
-    def write(self, path, data):
+    def write(self, path, data, offset=0):
         """write data at path
 
         path is a string, data binary; it is responsability of the caller
@@ -516,11 +517,11 @@ class _Proxy(object):
         """
 
         # fixme: check of path type delayed to str2bytez
-        if not isinstance(data, bytes):
-            raise TypeError("'data' argument must be of type 'bytes'")
+        if not isinstance(data, (bytes, bytearray, )):
+            raise TypeError("'data' argument must be binary")
 
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
-                                   size=len(data))
+                                   size=len(data), offset=offset)
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
