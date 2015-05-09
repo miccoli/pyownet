@@ -141,17 +141,14 @@ def bytes2str(b):
 
 class Error(pyownet.Error):
     """Base class for all module errors"""
-    pass
 
 
 class ConnError(Error, IOError):
     """raised if no valid connection can be established with owserver"""
-    pass
 
 
 class ProtocolError(Error):
     """raised if no valid server response was received"""
-    pass
 
 
 class MalformedHeader(ProtocolError):
@@ -174,7 +171,6 @@ class ShortWrite(ProtocolError):
 
 class OwnetError(Error, EnvironmentError):
     """raised if owserver returns error code"""
-    pass
 
 
 #
@@ -321,7 +317,6 @@ class OwnetConnection(object):
             self.socket.shutdown(socket.SHUT_RDWR)
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
-            pass
         self.socket.close()
 
     def req(self, msgtype, payload, flags, size=0, offset=0):

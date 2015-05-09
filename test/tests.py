@@ -91,7 +91,6 @@ class TestProtocol_misc(unittest.TestCase):
     def test_exceptions(self):
         self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
         self.assertRaises(TypeError, protocol.clone, 1)
-        pass
 
 if __name__ == '__main__':
     unittest.main()
