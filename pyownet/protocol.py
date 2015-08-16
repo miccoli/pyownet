@@ -141,17 +141,14 @@ def bytes2str(b):
 
 class Error(pyownet.Error):
     """Base class for all module errors"""
-    pass
 
 
 class ConnError(Error, IOError):
     """raised if no valid connection can be established with owserver"""
-    pass
 
 
 class ProtocolError(Error):
     """raised if no valid server response was received"""
-    pass
 
 
 class MalformedHeader(ProtocolError):
@@ -174,7 +171,6 @@ class ShortWrite(ProtocolError):
 
 class OwnetError(Error, EnvironmentError):
     """raised if owserver returns error code"""
-    pass
 
 
 #

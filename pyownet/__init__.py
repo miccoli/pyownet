@@ -23,4 +23,3 @@ __version__ = '0.8.2dev0'
 
 class Error(Exception):
     """Base class for all package errors"""
-    pass
