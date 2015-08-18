@@ -22,7 +22,7 @@ but there exist also ethernet or other network adapters.
    .. _1-Wire Maxim:
        http://www.maximintegrated.com/en/products/comms/one-wire.html
 
-   `1-Wire Wikipedia <http://en.wikipedia.org/wiki/1-Wire>`_
+   `1-Wire Wikipedia <https://en.wikipedia.org/wiki/1-Wire>`_
        description of the 1-Wire bus system on Wikipedia
 
 
