@@ -3,23 +3,21 @@
 This module is a pure python, low level implementation of the ownet
 protocol.
 
-OwnetProxy instances are proxy objects whose methods correspond to ownet
-protocol messages.
+Interaction with an owserver takes place via a proxy object whose methods
+correspond to ownet messages. Proxy objects are created by factory function
+'proxy'.
 
->>> owproxy = OwnetProxy(host="owserver.example.com", port=4304)
+>>> owproxy = proxy(host="owserver.example.com", port=4304)
 >>> owproxy.ping()
 >>> owproxy.dir()
-['/10.67C6697351FF/', '/05.4AEC29CDBAAB/']
+[u'/10.67C6697351FF/', u'/05.4AEC29CDBAAB/']
 >>> owproxy.present('/10.67C6697351FF/temperature')
 True
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
 >>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
 >>> owproxy.dir()
-['/sensA/', '/05.4AEC29CDBAAB/']
-
-The OwnetConnection class encapsulates all socket operations and
-interactions with the server and is meant for internal use.
+[u'/sensA/', u'/05.4AEC29CDBAAB/']
 
 """
 
@@ -70,40 +68,40 @@ MSG_DIRALLSLASH = 9
 MSG_GETSLASH = 10
 
 # see http://owfs.org/index.php?page=owserver-flag-word
-# and ow_parsedname.h
-FLG_BUS_RET =     0x00000002
+# and module/owlib/src/include/ow_parsedname.h
+FLG_BUS_RET = 0x00000002
 FLG_PERSISTENCE = 0x00000004
-FLG_ALIAS =       0x00000008
-FLG_SAFEMODE =    0x00000010
-FLG_UNCACHED =    0x00000020
-FLG_OWNET =       0x00000100
+FLG_ALIAS = 0x00000008
+FLG_SAFEMODE = 0x00000010
+FLG_UNCACHED = 0x00000020
+FLG_OWNET = 0x00000100
 
 # look for
 # 'enum temp_type' in ow_temperature.h
 # 'enum pressure_type' in ow_pressure.h
 # 'enum deviceformat' in ow.h
 
-FLG_TEMP_C =        0x00000000
-FLG_TEMP_F =        0x00010000
-FLG_TEMP_K =        0x00020000
-FLG_TEMP_R =        0x00030000
-MSK_TEMPSCALE =     0x00030000
+FLG_TEMP_C = 0x00000000
+FLG_TEMP_F = 0x00010000
+FLG_TEMP_K = 0x00020000
+FLG_TEMP_R = 0x00030000
+MSK_TEMPSCALE = 0x00030000
 
-FLG_PRESS_MBAR =    0x00000000
-FLG_PRESS_ATM =     0x00040000
-FLG_PRESS_MMHG =    0x00080000
-FLG_PRESS_INHG =    0x000C0000
-FLG_PRESS_PSI =     0x00100000
-FLG_PRESS_PA =      0x00140000
+FLG_PRESS_MBAR = 0x00000000
+FLG_PRESS_ATM = 0x00040000
+FLG_PRESS_MMHG = 0x00080000
+FLG_PRESS_INHG = 0x000C0000
+FLG_PRESS_PSI = 0x00100000
+FLG_PRESS_PA = 0x00140000
 MSK_PRESSURESCALE = 0x001C0000
 
-FLG_FORMAT_FDI =    0x00000000   # /10.67C6697351FF
-FLG_FORMAT_FI =     0x01000000   # /1067C6697351FF
-FLG_FORMAT_FDIDC =  0x02000000   # /10.67C6697351FF.8D
-FLG_FORMAT_FDIC =   0x03000000   # /10.67C6697351FF8D
-FLG_FORMAT_FIDC =   0x04000000   # /1067C6697351FF.8D
-FLG_FORMAT_FIC =    0x05000000   # /1067C6697351FF8D
-MSK_DEVFORMAT =     0xFF000000
+FLG_FORMAT_FDI = 0x00000000    # /10.67C6697351FF
+FLG_FORMAT_FI = 0x01000000     # /1067C6697351FF
+FLG_FORMAT_FDIDC = 0x02000000  # /10.67C6697351FF.8D
+FLG_FORMAT_FDIC = 0x03000000   # /10.67C6697351FF8D
+FLG_FORMAT_FIDC = 0x04000000   # /1067C6697351FF.8D
+FLG_FORMAT_FIC = 0x05000000    # /1067C6697351FF8D
+MSK_DEVFORMAT = 0xFF000000
 
 # useful paths
 PTH_ERRCODES = '/settings/return_codes/text.ALL'
@@ -122,14 +120,14 @@ MAX_PAYLOAD = 65536
 #
 
 def str2bytez(s):
-    "transform string to zero-terminated bytes"
+    """Transform string to zero-terminated bytes."""
     if not isinstance(s, basestring):
         raise TypeError()
     return s.encode('ascii') + b'\x00'
 
 
 def bytes2str(b):
-    "transform bytes to string"
+    """Transform bytes to string"""
     if not isinstance(b, (bytes, bytearray, )):
         raise TypeError()
     return b.decode('ascii')
@@ -140,18 +138,20 @@ def bytes2str(b):
 #
 
 class Error(pyownet.Error):
-    """Base class for all module errors"""
+    """Base class for all module errors."""
 
 
 class ConnError(Error, IOError):
-    """raised if no valid connection can be established with owserver"""
+    """Raised if no valid connection can be established with owserver."""
 
 
 class ProtocolError(Error):
-    """raised if no valid server response was received"""
+    """Raised if no valid server response received."""
 
 
 class MalformedHeader(ProtocolError):
+    """Raised for header parsing errors."""
+
     def __init__(self, msg, header):
         self.msg = msg
         self.header = header
@@ -162,15 +162,15 @@ class MalformedHeader(ProtocolError):
 
 
 class ShortRead(ProtocolError):
-    pass
+    """Raised if not enough date received."""
 
 
 class ShortWrite(ProtocolError):
-    pass
+    """Raised if unable to write all data."""
 
 
 class OwnetError(Error, EnvironmentError):
-    """raised if owserver returns error code"""
+    """Raised when owserver returns error code"""
 
 
 #
@@ -286,17 +286,17 @@ class _FromServerHeader(_Header):
 # connection object
 #
 
-class OwnetConnection(object):
-    """This class encapsulates a connection to an owserver"""
+class _OwnetConnection(object):
+    """This class encapsulates a connection to an owserver."""
 
     def __init__(self, sockaddr, family=socket.AF_INET, verbose=False):
-        "establish a connection with server at sockaddr"
+        """establish a connection with server at sockaddr"""
 
         self.verbose = verbose
 
         self.socket = socket.socket(family, socket.SOCK_STREAM)
         self.socket.settimeout(_SCK_TIMEOUT)
-        ## FIXME: is _SO_KEEPALIVE really useful?
+        # FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
         self.socket.connect(sockaddr)
 
@@ -304,11 +304,11 @@ class OwnetConnection(object):
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
     def __str__(self):
-        return "OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
-                                                   self.socket.getpeername())
+        return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
+                                                    self.socket.getpeername())
 
     def shutdown(self):
-        "shutdown connection"
+        """shutdown connection"""
 
         if self.verbose:
             print(self.socket.getsockname(), 'xx', self.socket.getpeername())
@@ -321,7 +321,7 @@ class OwnetConnection(object):
         self.socket.close()
 
     def req(self, msgtype, payload, flags, size=0, offset=0):
-        "send message to server and return response"
+        """send message to server and return response"""
 
         tohead = _ToServerHeader(payload=len(payload), type=msgtype,
                                  flags=flags, size=size, offset=offset)
@@ -337,7 +337,7 @@ class OwnetConnection(object):
             return fromhead.ret, fromhead.flags, data
 
     def _send_msg(self, header, payload):
-        "send message to server"
+        """send message to server"""
         if self.verbose:
             print('->', repr(header))
             print('..', repr(payload))
@@ -386,10 +386,10 @@ class OwnetConnection(object):
             return buf
 
     def _read_msg(self):
-        "read message from server"
+        """read message from server"""
 
-        header = _FromServerHeader(
-                    self._read_socket(_FromServerHeader.header_size))
+        header = _FromServerHeader(self._read_socket(_FromServerHeader
+                                                     .header_size))
         if self.verbose:
             print('<-', repr(header))
 
@@ -416,7 +416,8 @@ class OwnetConnection(object):
 
 class _Proxy(object):
     """Proxy object with methods to query an owserver,
-    socket connection is non persistent, stateless, thread-safe"""
+    socket connection is non persistent, stateless, thread-safe
+    """
 
     # no init logic, should be instatiated by a factory function
     def __init__(self, family, address, flags=0,
@@ -449,7 +450,7 @@ class _Proxy(object):
         flags |= self.flags
 
         try:
-            conn = OwnetConnection(self._sockaddr, self._family, self.verbose)
+            conn = _OwnetConnection(self._sockaddr, self._family, self.verbose)
             ret, _, data = conn.req(msgtype, payload, flags, size, offset)
         except IOError as err:
             raise ConnError(*err.args)
@@ -458,13 +459,13 @@ class _Proxy(object):
         return ret, data
 
     def ping(self):
-        "sends a NOP packet and waits response; returns None"
+        """sends a NOP packet and waits response; returns None"""
         ret, data = self.sendmess(MSG_NOP, bytes())
         if (ret, data) != (0, bytes()):
             raise OwnetError(-ret, self.errmess[-ret])
 
     def present(self, path):
-        "returns True if there is an entity at path"
+        """returns True if there is an entity at path"""
 
         ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
         assert ret <= 0 and len(data) == 0
@@ -474,7 +475,7 @@ class _Proxy(object):
             return True
 
     def dir(self, path='/', slash=True, bus=False):
-        "list entities at path"
+        """list entities at path"""
 
         if slash:
             msg = MSG_DIRALLSLASH
@@ -494,7 +495,7 @@ class _Proxy(object):
             return []
 
     def read(self, path, size=MAX_PAYLOAD, offset=0):
-        "read data at path"
+        """read data at path"""
 
         if size > MAX_PAYLOAD:
             raise ValueError("size cannot exceed %d" % MAX_PAYLOAD)
@@ -525,7 +526,8 @@ class _Proxy(object):
 
 class _PersistentProxy(_Proxy):
     """Proxy object with methods to query an owserver,
-    socket connection is persistent, statefull, not thread-safe"""
+    socket connection is persistent, statefull, not thread-safe
+    """
 
     def __init__(self, family, address,
                  flags=0, verbose=False, errmess=_errtuple(), ):
@@ -547,9 +549,9 @@ class _PersistentProxy(_Proxy):
     def _open_connection(self):
         assert self.conn is None
         try:
-            self.conn = OwnetConnection(self._sockaddr,
-                                        self._family,
-                                        self.verbose)
+            self.conn = _OwnetConnection(self._sockaddr,
+                                         self._family,
+                                         self.verbose)
         except IOError as err:
             raise ConnError(*err.args)
 
@@ -561,7 +563,8 @@ class _PersistentProxy(_Proxy):
             assert self.conn is None
 
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
-        """ retcode, data = sendmess(msgtype, payload)
+        """
+        retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
         """
 
@@ -650,7 +653,8 @@ class OwnetProxy(_Proxy):
 def proxy(host='localhost', port=4304, flags=0, persistent=False,
           verbose=False, ):
     """factory function that returns a proxy object for an owserver at
-       host, port. """
+    host, port.
+    """
 
     if persistent:
         pclass = _PersistentProxy
