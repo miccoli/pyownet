@@ -47,15 +47,14 @@ import socket
 
 import pyownet
 
-# socket constants
-_SOL_SOCKET = socket.SOL_SOCKET
-_SO_KEEPALIVE = socket.SO_KEEPALIVE
+#
+# owserver protocol related constants
+#
 
-if __debug__:
-    import errno
-    _ENOTCONN = errno.ENOTCONN
+# for message type classification see
+# http://owfs.org/index.php?page=owserver-message-types
+# and 'enum msg_classification' from module/owlib/src/include/ow_message.h
 
-# see 'enum msg_classification' from ow_message.h
 MSG_ERROR = 0
 MSG_NOP = 1
 MSG_READ = 2
@@ -67,8 +66,10 @@ MSG_GET = 8
 MSG_DIRALLSLASH = 9
 MSG_GETSLASH = 10
 
-# see http://owfs.org/index.php?page=owserver-flag-word
+# for owserver flag word definition see
+# http://owfs.org/index.php?page=owserver-flag-word
 # and module/owlib/src/include/ow_parsedname.h
+
 FLG_BUS_RET = 0x00000002
 FLG_PERSISTENCE = 0x00000004
 FLG_ALIAS = 0x00000008
@@ -76,17 +77,14 @@ FLG_SAFEMODE = 0x00000010
 FLG_UNCACHED = 0x00000020
 FLG_OWNET = 0x00000100
 
-# look for
-# 'enum temp_type' in ow_temperature.h
-# 'enum pressure_type' in ow_pressure.h
-# 'enum deviceformat' in ow.h
-
+# see also 'enum temp_type' in module/owlib/src/include/ow_temperature.h
 FLG_TEMP_C = 0x00000000
 FLG_TEMP_F = 0x00010000
 FLG_TEMP_K = 0x00020000
 FLG_TEMP_R = 0x00030000
 MSK_TEMPSCALE = 0x00030000
 
+# see also 'enum pressure_type' in module/owlib/src/include/ow_pressure.h
 FLG_PRESS_MBAR = 0x00000000
 FLG_PRESS_ATM = 0x00040000
 FLG_PRESS_MMHG = 0x00080000
@@ -95,6 +93,7 @@ FLG_PRESS_PSI = 0x00100000
 FLG_PRESS_PA = 0x00140000
 MSK_PRESSURESCALE = 0x001C0000
 
+# see also 'enum deviceformat' in module/owlib/src/include/ow.h
 FLG_FORMAT_FDI = 0x00000000    # /10.67C6697351FF
 FLG_FORMAT_FI = 0x01000000     # /1067C6697351FF
 FLG_FORMAT_FDIDC = 0x02000000  # /10.67C6697351FF.8D
@@ -103,16 +102,30 @@ FLG_FORMAT_FIDC = 0x04000000   # /1067C6697351FF.8D
 FLG_FORMAT_FIC = 0x05000000    # /1067C6697351FF8D
 MSK_DEVFORMAT = 0xFF000000
 
-# useful paths
+#
+# useful owfs paths
+#
+
 PTH_ERRCODES = '/settings/return_codes/text.ALL'
+PTH_VERSION = '/system/configuration/version'
+PTH_PID = '/system/process/pid'
 
+#
+# pyownet implementation specific constants
+#
 
-# internal constants
+# do not attempt to read messages bigger than this (bytes)
+MAX_PAYLOAD = 65536
 
 # socket timeout (s)
 _SCK_TIMEOUT = 2.0
-# do not attempt to read messages bigger than this (bytes)
-MAX_PAYLOAD = 65536
+
+# socket and errno module constants
+_SOL_SOCKET = socket.SOL_SOCKET
+_SO_KEEPALIVE = socket.SO_KEEPALIVE
+if __debug__:
+    import errno
+    _ENOTCONN = errno.ENOTCONN
 
 
 #
@@ -121,13 +134,15 @@ MAX_PAYLOAD = 65536
 
 def str2bytez(s):
     """Transform string to zero-terminated bytes."""
+
     if not isinstance(s, basestring):
         raise TypeError()
     return s.encode('ascii') + b'\x00'
 
 
 def bytes2str(b):
-    """Transform bytes to string"""
+    """Transform bytes to string."""
+
     if not isinstance(b, (bytes, bytearray, )):
         raise TypeError()
     return b.decode('ascii')
@@ -180,7 +195,8 @@ class OwnetError(Error, EnvironmentError):
 class _errtuple(tuple):
     """tuple subtype for "error number" -> "error message" mapping
 
-    if error number is not defined returns a standard message"""
+    if error number is not defined returns a standard message
+    """
 
     _message = ''
 
@@ -225,7 +241,8 @@ class _addfieldprops(type):
 class _Header(bytes):
     """abstract header class, obtained as a 'bytes' subclass
 
-    should not be instantiated directly"""
+    should not be instantiated directly
+    """
 
     __metaclass__ = _addfieldprops
 
@@ -257,7 +274,6 @@ class _Header(bytes):
         return repr
 
     def __new__(cls, *args, **kwargs):
-
         # if cls is _Header:
         #     raise TypeError("_Header class may not be instantiated")
         msg, vals = cls._parse(*args, **kwargs)
@@ -283,7 +299,7 @@ class _FromServerHeader(_Header):
 
 
 #
-# connection object
+# connection object (internal)
 #
 
 class _OwnetConnection(object):
@@ -338,6 +354,7 @@ class _OwnetConnection(object):
 
     def _send_msg(self, header, payload):
         """send message to server"""
+
         if self.verbose:
             print('->', repr(header))
             print('..', repr(payload))
@@ -347,8 +364,16 @@ class _OwnetConnection(object):
             raise ShortWrite()
         assert sent == len(header + payload), sent
 
+    #
+    # implementation of _read_socket is version dependent
+    #
+    # NOTE:
+    # '_read_socket(self, nbytes)' was implemented as
+    # 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
+    # but socket.MSG_WAITALL proved not reliable
+
     if sys.version_info < (2, 7, 6, ):
-        # legacy python support, will be deprecated in the future
+        # legacy python support, will be dropped in the future
 
         def _read_socket(self, nbytes):
             """read nbytes bytes from self.socket"""
@@ -369,9 +394,6 @@ class _OwnetConnection(object):
 
         def _read_socket(self, nbytes):
             """read nbytes bytes from self.socket"""
-
-            # was 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
-            # but implementation proved not reliable
 
             buf = bytearray(nbytes)
             view = memoryview(buf)
@@ -419,10 +441,8 @@ class _Proxy(object):
     socket connection is non persistent, stateless, thread-safe
     """
 
-    # no init logic, should be instatiated by a factory function
     def __init__(self, family, address, flags=0,
                  verbose=False, errmess=_errtuple(), ):
-
         # save init args
         self._family, self._sockaddr = family, address
         self.flags = flags
@@ -433,7 +453,6 @@ class _Proxy(object):
         return "ownet server at %s" % (self._sockaddr, )
 
     def _init_errcodes(self):
-
         # fetch errcodes array from owserver
         try:
             self.errmess = _errtuple(
@@ -460,6 +479,7 @@ class _Proxy(object):
 
     def ping(self):
         """sends a NOP packet and waits response; returns None"""
+
         ret, data = self.sendmess(MSG_NOP, bytes())
         if (ret, data) != (0, bytes()):
             raise OwnetError(-ret, self.errmess[-ret])
@@ -531,7 +551,7 @@ class _PersistentProxy(_Proxy):
 
     def __init__(self, family, address,
                  flags=0, verbose=False, errmess=_errtuple(), ):
-
+        # same as parent but sets FLG_PERSISTENCE
         super(_PersistentProxy, self).__init__(
             family, address, flags | FLG_PERSISTENCE, verbose, errmess)
 
@@ -586,8 +606,15 @@ class _PersistentProxy(_Proxy):
         return ret, data
 
 
+#
+# legacy classes, please use factory functions instead
+#
+
 class OwnetProxy(_Proxy):
-    """Objects of this class define methods to query a given owserver"""
+    """This class is for legacy support only, and will be deprecated.
+
+    Objects of this class define methods to query a given owserver
+    """
 
     def __init__(self, host='localhost', port=4304, flags=0,
                  verbose=False, ):
@@ -692,13 +719,15 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
 
 
 def clone(proxy, persistent=True):
+    """factory function for cloning a proxy object"""
+
+    if not isinstance(proxy, _Proxy):
+        raise TypeError('argument is not a Proxy object')
 
     if persistent:
         pclass = _PersistentProxy
     else:
         pclass = _Proxy
 
-    if not isinstance(proxy, _Proxy):
-        raise TypeError('argument is not a Proxy object')
     return pclass(proxy._family, proxy._sockaddr,
                   proxy.flags, proxy.verbose, proxy.errmess)
