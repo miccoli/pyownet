@@ -3,28 +3,37 @@ import sys
 import os
 from pyownet import protocol
 
-if sys.version_info < (2, 7, ):
-    raise NotImplementedError(
-        'Unit testing not implemented for this python version')
-elif sys.version_info < (3, ):
-    from ConfigParser import ConfigParser
-else:
-    from configparser import ConfigParser
+def setUpModule():
+    if sys.version_info < (3, ):
+        from ConfigParser import ConfigParser
+    else:
+        from configparser import ConfigParser
+        import warnings
 
-config = ConfigParser()
+        warnings.simplefilter('ignore', PendingDeprecationWarning)
 
-config.add_section('server')
-config.set('server', 'host', 'localhost')
-config.set('server', 'port', '4304')
+    config = ConfigParser()
 
-config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
+    config.add_section('server')
+    config.set('server', 'host', 'localhost')
+    config.set('server', 'port', '4304')
 
-HOST = config.get('server', 'host')
-PORT = config.get('server', 'port')
+    config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
+
+    global HOST, PORT
+
+    HOST = config.get('server', 'host')
+    PORT = config.get('server', 'port')
 
 
-class _ProxyTestMix(object):
-    # mixin class for proxy object testing
+class _TestProxyMix(object):
+    # mixin class for testing proxy object functionality
+
+    def setUp(self):
+        try:
+            getattr(self, 'proxy')
+        except AttributeError:
+            self.skipTest('no proxy available')
 
     def test_ping(self):
         self.assertIsNone(self.proxy.ping())
@@ -44,16 +53,12 @@ class _ProxyTestMix(object):
     def test_exceptions(self):
         self.assertRaises(protocol.OwnetError, self.proxy.dir, '/nonexistent')
         self.assertRaises(protocol.OwnetError, self.proxy.read, '/')
-        self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
-                          host='nonexistent.fake')
-        self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
-        self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
         self.assertRaises(TypeError, self.proxy.dir, 1)
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
 
 
-class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
+class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
 
     @classmethod
     def setUpClass(cls):
@@ -64,18 +69,18 @@ class TestProtocolOwnetProxy(unittest.TestCase, _ProxyTestMix):
                                (HOST, PORT, exc))
 
 
-class TestProtocol_proxy_factory(unittest.TestCase, _ProxyTestMix):
+class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
 
     @classmethod
     def setUpClass(cls):
         try:
-            cls.proxy = protocol.proxy(HOST, PORT)
+            cls.proxy = protocol.proxy(HOST, PORT, persistent=False)
         except protocol.ConnError as exc:
             raise RuntimeError('no owserver on %s:%s, got:%s' %
                                (HOST, PORT, exc))
 
 
-class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
+class Test_PersistentProxy(_TestProxyMix, unittest.TestCase, ):
 
     @classmethod
     def setUpClass(cls):
@@ -86,9 +91,43 @@ class TestProtocol_proxy_factory_persitent(unittest.TestCase, _ProxyTestMix):
                                (HOST, PORT, exc))
 
 
-class TestProtocol_misc(unittest.TestCase):
+class Test_clone_FT(Test_Proxy):
+
+    def setUp(self):
+        assert not isinstance(self.__class__.proxy, protocol._PersistentProxy)
+        self.proxy = protocol.clone(self.__class__.proxy, persistent=True)
+
+    def tearDown(self):
+        self.proxy.close_connection()
+
+class Test_clone_FF(Test_Proxy):
+
+    def setUp(self):
+        assert not isinstance(self.__class__.proxy, protocol._PersistentProxy)
+        self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
+
+class Test_clone_TT(Test_PersistentProxy):
+
+    def setUp(self):
+        assert isinstance(self.__class__.proxy, protocol._PersistentProxy)
+        self.proxy = protocol.clone(self.__class__.proxy, persistent=True)
+
+    def tearDown(self):
+        self.proxy.close_connection()
+
+class Test_clone_TF(Test_PersistentProxy):
+
+    def setUp(self):
+        assert isinstance(self.__class__.proxy, protocol._PersistentProxy)
+        self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
+
+class Test_misc(unittest.TestCase):
 
     def test_exceptions(self):
+        self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
+                          host='nonexistent.fake')
+        self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
+        self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
         self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
         self.assertRaises(TypeError, protocol.clone, 1)
 

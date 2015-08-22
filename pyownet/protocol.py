@@ -443,6 +443,9 @@ class _Proxy(object):
 
     def __init__(self, family, address, flags=0,
                  verbose=False, errmess=_errtuple(), ):
+        if flags & FLG_PERSISTENCE:
+            raise ValueError('cannot set FLG_PERSISTENCE')
+
         # save init args
         self._family, self._sockaddr = family, address
         self.flags = flags
@@ -467,6 +470,7 @@ class _Proxy(object):
         """
 
         flags |= self.flags
+        assert not (flags & FLG_PERSISTENCE)
 
         try:
             conn = _OwnetConnection(self._sockaddr, self._family, self.verbose)
@@ -551,12 +555,11 @@ class _PersistentProxy(_Proxy):
 
     def __init__(self, family, address,
                  flags=0, verbose=False, errmess=_errtuple(), ):
-        # same as parent but sets FLG_PERSISTENCE
         super(_PersistentProxy, self).__init__(
-            family, address, flags | FLG_PERSISTENCE, verbose, errmess)
+            family, address, flags, verbose, errmess)
 
         self.conn = None
-        assert self.flags & FLG_PERSISTENCE
+        self.flags |= FLG_PERSISTENCE
 
     def __enter__(self):
         if not self.conn:
@@ -594,6 +597,7 @@ class _PersistentProxy(_Proxy):
         assert self.conn is not None
 
         flags |= self.flags
+        assert (flags & FLG_PERSISTENCE)
         try:
             ret, rflags, data = self.conn.req(
                 msgtype, payload, flags, size, offset)
@@ -730,4 +734,4 @@ def clone(proxy, persistent=True):
         pclass = _Proxy
 
     return pclass(proxy._family, proxy._sockaddr,
-                  proxy.flags, proxy.verbose, proxy.errmess)
+                  proxy.flags & ~FLG_PERSISTENCE, proxy.verbose, proxy.errmess)
