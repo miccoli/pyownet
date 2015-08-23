@@ -18,9 +18,8 @@
 #
 
 __all__ = ['__version__', ]
-__version__ = '0.9.0dev4'
+__version__ = '0.9.0dev5'
 
 
 class Error(Exception):
     """Base class for all package errors"""
-    pass

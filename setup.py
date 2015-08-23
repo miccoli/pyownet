@@ -36,6 +36,6 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     packages = ['pyownet', ],
-    test_suite = "test.tests",
+    test_suite = "test.test_protocol",
     use_2to3 = True,
 )

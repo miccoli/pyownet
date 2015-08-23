@@ -49,21 +49,19 @@ def main():
         delta *= 2
 
 
-connstatus = lambda x: '+' if x.conn else '_'
-
 def worker(proxy, id):
 
     with protocol.clone(proxy, persistent=True) as pers:
-        log('**[{0:02d}] {1}'.format(id, pers.conn))
+        log('**[{0:02d}   ] {1}'.format(id, pers.conn))
 
         iter = 0
         nap = 1
         while True:
             time.sleep(nap)
             try:
-                res = pers.dir()
-                log('..[{0:02d}.{2:02d} {3}] {1}'.format(
-                    id, res, iter, connstatus(pers)))
+                _ = pers.dir()
+                log('..[{0:02d}.{1:02d}] {2}'.format(
+                    id, iter, pers.conn))
             except protocol.Error as exc:
                 log('!![{0:02d}] dead after {1:d}s: {2}'.format(id, nap, exc))
                 break
