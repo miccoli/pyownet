@@ -10,14 +10,14 @@ correspond to ownet messages. Proxy objects are created by factory function
 >>> owproxy = proxy(host="owserver.example.com", port=4304)
 >>> owproxy.ping()
 >>> owproxy.dir()
-[u'/10.67C6697351FF/', u'/05.4AEC29CDBAAB/']
+['/10.67C6697351FF/', '/05.4AEC29CDBAAB/']
 >>> owproxy.present('/10.67C6697351FF/temperature')
 True
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
 >>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
 >>> owproxy.dir()
-[u'/sensA/', u'/05.4AEC29CDBAAB/']
+['/sensA/', '/05.4AEC29CDBAAB/']
 
 """
 
@@ -45,7 +45,7 @@ import warnings
 import struct
 import socket
 
-import pyownet
+from . import Error as PackageError
 
 #
 # owserver protocol related constants
@@ -109,6 +109,7 @@ MSK_DEVFORMAT = 0xFF000000
 PTH_ERRCODES = '/settings/return_codes/text.ALL'
 PTH_VERSION = '/system/configuration/version'
 PTH_PID = '/system/process/pid'
+PTH_STRUCTURE = '/structure/'
 
 #
 # pyownet implementation specific constants
@@ -140,19 +141,25 @@ def str2bytez(s):
     return s.encode('ascii') + b'\x00'
 
 
+if sys.version_info < (3, ):
+    _tostr = lambda x: str(x)
+else:
+    _tostr = lambda x: str(x, 'ascii')
+
+
 def bytes2str(b):
     """Transform bytes to string."""
 
     if not isinstance(b, (bytes, bytearray, )):
         raise TypeError()
-    return b.decode('ascii')
+    return _tostr(b)
 
 
 #
 # exceptions
 #
 
-class Error(pyownet.Error):
+class Error(PackageError):
     """Base class for all module errors."""
 
 

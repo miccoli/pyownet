@@ -1,7 +1,7 @@
 # sensors
 
 #
-# Copyright 2013, 2014 Stefano Miccoli
+# Copyright 2013, 2015 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,15 +19,20 @@
 
 from __future__ import print_function
 
+import sys
 import types
 import re
 import weakref
 
-from pyownet import protocol
+from .protocol import bytes2str
+from . import protocol
 
 _STRUCT_DIR = '/structure/'
-_TYPE_CODE = dict(i=int, u=int, f=float, l=str, a=str, b=bytes, y=bool,
-                  d=str, t=float, g=float, p=float)
+
+# see http://owfs.org/index.php?page=structure-directory
+_TYPE_CODE = dict(i=int, u=int, f=float,
+                  l=bytes2str, a=bytes2str, b=bytes, y=bool,
+                  d=bytes2str, t=float, g=float, p=float)
 _PAGE = re.compile(r'.+\.[0-9]+')
 
 
@@ -91,11 +96,11 @@ def _sens_namespace(proxy, entity, structure):
         cast = _TYPE_CODE[prop.type]
         read = lambda: cast(proxy.read(path))
         read.__doc__ = "returns %s as %s" % (path, cast)
-        # fixme: str(name) is because in python 2 unicode is distinct form str
-        read.__name__ = str(name)
+        read.__name__ = name
         return read
 
     def rbuild(path):
+        assert isinstance(path, str), "not a string '%s'" % path
         namespace = dict()
         pre = len(path)
         for i in proxy.dir(path, slash=True):
@@ -128,10 +133,10 @@ class Root(object):
 
         if ':' in hostport:
             host, port = hostport.split(':')
-            self.proxy = protocol.OwnetProxy(host, port)
+            self.proxy = protocol.proxy(host, port)
         else:
             host = hostport
-            self.proxy = protocol.OwnetProxy(host)
+            self.proxy = protocol.proxy(host)
 
         # dicts for caching struct directory and sensors instances
         self._structure = dict()
@@ -155,7 +160,7 @@ class Root(object):
         if family not in self._structure:
             self._structure[family] = dict(
                 (i.split('/', 3)[-1], Properties(j))
-                for i, j in self._walk(_STRUCT_DIR + family + '/')
+                for i, j in self._walk(protocol.PTH_STRUCTURE + family + '/')
                 )
         return self._structure[family]
 
@@ -192,24 +197,6 @@ class Root(object):
 
 def _main():
 
-    import sys
-
-    def recprint(prefix, s):
-        fprint = lambda s1, s2: print(prefix+'{0!s:.<14} {1!r}'.format(s1, s2))
-        for att in dir(s):
-            fatt = getattr(s, att, None)
-            if isinstance(fatt, types.FunctionType):
-                try:
-                    fprint(att+'()', fatt(), )
-                except protocol.OwnetError as exp:
-                    fprint(att+'()', exp, )
-            elif isinstance(fatt, str) and not fatt.startswith('__'):
-                fprint(att, fatt)
-            elif isinstance(fatt, _sensor):
-                head = prefix+att+'/'
-                print(head)
-                recprint(' '*(len(head)-1) + prefix, fatt)
-
     try:
         hostport = sys.argv[1]
     except IndexError:
@@ -223,7 +210,25 @@ def _main():
         assert s is root.getsensor(i)
         assert s is root.getsensor(i)
         print(s)
-        recprint('|-', s, )
+        _recprint('|-', s, )
+
+
+def _recprint(prefix, s):
+    fprint = lambda s1, s2: print(prefix+'{0!s:.<14} {1!r}'.format(s1, s2))
+    for att in dir(s):
+        fatt = getattr(s, att, None)
+        if isinstance(fatt, types.FunctionType):
+            try:
+                fprint(att+'()', fatt(), )
+            except protocol.OwnetError as exp:
+                fprint(att+'()', exp, )
+        elif isinstance(fatt, str) and not fatt.startswith('__'):
+            fprint(att, fatt)
+        elif isinstance(fatt, _sensor):
+            head = prefix+att+'/'
+            print(head)
+            _recprint(' '*(len(head)-1) + prefix, fatt)
+
 
 if __name__ == '__main__':
     _main()
