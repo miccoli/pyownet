@@ -7,7 +7,7 @@ with open('README.rst') as infile:
 regex = re.compile(
     r"__version__ = (?P<quot>['\"])(?P<ver>[\w.+-]+?)(?P=quot)$", )
 
-with open('lib/pyownet/__init__.py') as infile:
+with open('src/pyownet/__init__.py') as infile:
     for line in infile:
         version_match = regex.match(line)
         if version_match:
@@ -35,7 +35,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
     ],
-    package_dir = {'': 'lib'},
+    package_dir = {'': 'src'},
     packages = ['pyownet', ],
     test_suite = "test.test_protocol",
     use_2to3 = True,
