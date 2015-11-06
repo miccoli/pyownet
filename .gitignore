@@ -36,3 +36,6 @@ nosetests.xml
 
 # emacs backup files
 *~
+
+# pyenv config
+.python-version

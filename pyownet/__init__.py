@@ -1,4 +1,4 @@
-"""python ownet client"""
+"""python owserver client"""
 
 #
 # Copyright 2013-2015 Stefano Miccoli
@@ -18,7 +18,7 @@
 #
 
 __all__ = ['__version__', ]
-__version__ = '0.8.2'
+__version__ = '0.8.3dev0'
 
 
 class Error(Exception):

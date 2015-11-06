@@ -20,7 +20,7 @@ with open('pyownet/__init__.py') as infile:
 setup(
     name = 'pyownet',
     version = __version__,
-    description = 'python ownet client library',
+    description = 'python owserver client library',
     long_description = long_description,
     author = 'Stefano Miccoli',
     author_email = 'stefano.miccoli@polimi.it',
