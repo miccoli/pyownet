@@ -1,23 +1,20 @@
-"""ownet protocol implementation
+"""owserver protocol implementation
 
-This module is a pure python, low level implementation of the ownet
+This module is a pure python, low level implementation of the owserver
 protocol.
 
 Interaction with an owserver takes place via a proxy object whose methods
-correspond to ownet messages. Proxy objects are created by factory function
+correspond to owserver messages. Proxy objects are created by factory function
 'proxy'.
 
 >>> owproxy = proxy(host="owserver.example.com", port=4304)
->>> owproxy.ping()
 >>> owproxy.dir()
-['/10.67C6697351FF/', '/05.4AEC29CDBAAB/']
->>> owproxy.present('/10.67C6697351FF/temperature')
-True
+[u'/10.67C6697351FF/', u'/05.4AEC29CDBAAB/']
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
 >>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
 >>> owproxy.dir()
-['/sensA/', '/05.4AEC29CDBAAB/']
+[u'/sensA/', u'/05.4AEC29CDBAAB/']
 
 """
 
@@ -460,7 +457,7 @@ class _Proxy(object):
         self.errmess = errmess
 
     def __str__(self):
-        return "ownet server at %s" % (self._sockaddr, )
+        return "owserver at %s" % (self._sockaddr, )
 
     def _init_errcodes(self):
         # fetch errcodes array from owserver
@@ -629,7 +626,7 @@ class OwnetProxy(_Proxy):
 
     def __init__(self, host='localhost', port=4304, flags=0,
                  verbose=False, ):
-        """return an ownet proxy object bound at (host, port); default is
+        """return an owserver proxy object bound at (host, port); default is
         (localhost, 4304).
 
         'flags' are or-ed in the header of each query sent to owserver.

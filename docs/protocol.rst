@@ -13,8 +13,8 @@
 
 The :mod:`pyownet.protocol` module is a low-level implementation of
 the client side of the owserver protocol. Interaction with an owserver
-takes place via a proxy object whose methods correspond to ownet
-messages::
+takes place via a proxy object whose methods correspond to the
+owserver protocol messages::
 
   >>> from pyownet import protocol
   >>> owproxy = protocol.proxy(host="server.example.com", port=4304)
