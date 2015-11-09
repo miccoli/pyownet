@@ -1,4 +1,8 @@
-import unittest
+import sys
+if sys.version_info < (2, 7, ):
+    import unittest2 as unittest
+else:
+    import unittest
 import warnings
 
 from pyownet import protocol
@@ -48,8 +52,8 @@ class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
         try:
             cls.proxy = protocol.OwnetProxy(HOST, PORT)
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
@@ -59,8 +63,8 @@ class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
         try:
             cls.proxy = protocol.proxy(HOST, PORT, persistent=False)
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_PersistentProxy(_TestProxyMix, unittest.TestCase, ):
@@ -70,8 +74,8 @@ class Test_PersistentProxy(_TestProxyMix, unittest.TestCase, ):
         try:
             cls.proxy = protocol.proxy(HOST, PORT, persistent=True, )
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_clone_FT(Test_Proxy):

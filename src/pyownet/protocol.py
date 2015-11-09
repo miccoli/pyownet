@@ -316,6 +316,9 @@ class _OwnetConnection(object):
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
+    def __del__(self):
+        self.socket.close()
+
     def __str__(self):
         return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
                                                     self.socket.getpeername())
@@ -331,7 +334,10 @@ class _OwnetConnection(object):
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
             pass
-        self.socket.close()
+        # FIXME: socket.close() moved to __del__();
+        # this is to avoid open sockets if shutdown is not called
+        # should instead enforce call to shutdown in _Proxy...?
+        # self.socket.close()
 
     def req(self, msgtype, payload, flags, size=0, offset=0):
         """send message to server and return response"""
