@@ -1,29 +1,12 @@
 import unittest
-import sys
-import os
+import warnings
+
 from pyownet import protocol
+from . import (HOST, PORT)
+
 
 def setUpModule():
-    if sys.version_info < (3, ):
-        from ConfigParser import ConfigParser
-    else:
-        from configparser import ConfigParser
-        import warnings
-
-        warnings.simplefilter('ignore', PendingDeprecationWarning)
-
-    config = ConfigParser()
-
-    config.add_section('server')
-    config.set('server', 'host', 'localhost')
-    config.set('server', 'port', '4304')
-
-    config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
-
-    global HOST, PORT
-
-    HOST = config.get('server', 'host')
-    PORT = config.get('server', 'port')
+    warnings.simplefilter('ignore', PendingDeprecationWarning)
 
 
 class _TestProxyMix(object):
@@ -100,11 +83,13 @@ class Test_clone_FT(Test_Proxy):
     def tearDown(self):
         self.proxy.close_connection()
 
+
 class Test_clone_FF(Test_Proxy):
 
     def setUp(self):
         assert not isinstance(self.__class__.proxy, protocol._PersistentProxy)
         self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
+
 
 class Test_clone_TT(Test_PersistentProxy):
 
@@ -115,11 +100,13 @@ class Test_clone_TT(Test_PersistentProxy):
     def tearDown(self):
         self.proxy.close_connection()
 
+
 class Test_clone_TF(Test_PersistentProxy):
 
     def setUp(self):
         assert isinstance(self.__class__.proxy, protocol._PersistentProxy)
         self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
+
 
 class Test_misc(unittest.TestCase):
 

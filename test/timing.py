@@ -3,22 +3,22 @@ import sys
 import timeit
 import argparse
 if sys.version_info < (3, ):
-    from urlparse import (urlsplit, urlunsplit)
+    from urlparse import (urlsplit, )
 else:
-    from urllib.parse import (urlsplit, urlunsplit)
+    from urllib.parse import (urlsplit, )
 
 import pyownet
 from pyownet import protocol
 
 
-def report(name, res):
-    scale = 1e3  # report times in ms
-    print('** {:15}'.format(name), end=':')
-    for t in (sorted(res)):
-        print(' {:5.2f} ms'.format(t / number * scale), end=',')
-    print()
+def main():
 
-if __name__ == '__main__':
+    def report(name, res):
+        scale = 1e3  # report times in ms
+        print('** {:15}'.format(name), end=':')
+        for t in (sorted(res)):
+            print(' {:5.2f} ms'.format(t / number * scale), end=',')
+        print()
 
     parser = argparse.ArgumentParser()
     parser.add_argument('uri', metavar='URI', nargs='?', default='/',
@@ -74,7 +74,10 @@ if __name__ == '__main__':
         stmt, number, repeat))
     print()
 
+    global proxy_obj
+
     proxy_obj = base
+    assert 'proxy_obj' in globals()
     try:
         eval(stmt, globals(), )
     except protocol.OwnetError as err:
@@ -90,3 +93,7 @@ if __name__ == '__main__':
     proxy_obj = protocol.clone(base, persistent=True)
     res = timer.repeat(number=number, repeat=repeat)
     report('persistent', res)
+
+
+if __name__ == '__main__':
+    main()
