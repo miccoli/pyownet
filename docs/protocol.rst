@@ -14,14 +14,14 @@
 The :mod:`pyownet.protocol` module is a low-level implementation of
 the client side of the owserver protocol. Interaction with an owserver
 takes place via a proxy object whose methods correspond to the
-owserver protocol messages::
+owserver protocol messages.
+
+::
 
   >>> from pyownet import protocol
   >>> owproxy = protocol.proxy(host="server.example.com", port=4304)
   >>> owproxy.dir()
   [u'/10.A7F1D92A82C8/', u'/05.D8FE434D9855/', u'/26.8CE2B3471711/']
-  >>> owproxy.present('/10.A7F1D92A82C8/temperature')
-  True
   >>> owproxy.read('/10.A7F1D92A82C8/temperature')
   '     6.68422'
 
@@ -72,11 +72,11 @@ Functions
    :param str host: host to contact
    :param int port: tcp port number to connect with
    :param int flags: protocol flag word to be ORed to each outgoing
-		     message (see :ref:`flags`).
+                     message (see :ref:`flags`).
    :param bool persistent: whether the requested connection is
-			   persistent or not.
+                           persistent or not.
    :param bool verbose: if true, print on ``sys.stdout`` debugging messages
-			related to the owserver protocol.
+                        related to the owserver protocol.
    :return: proxy object
 
    Proxy objects are created by this factory function; for
@@ -87,7 +87,7 @@ Functions
 
    :param proxy: existing proxy object
    :param bool persistent: whether the new proxy object is persistent
-			   or not
+                           or not
    :return: new proxy object
 
    There are costs involved in creating proxy objects (DNS lookups
@@ -97,35 +97,35 @@ Functions
    properties of the old one, with only the persistence parameter
    changed. Typically this can be useful if one desires to use
    persistent connections in a multi-threaded environment, as per
-   example below. ::
+   the example below::
 
      from pyownet import protocol
 
      def worker(shared_proxy):
-          with protocol.clone(shared_proxy, persistent=True) as newproxy:
-	      rep1 = newproxy.read(some_path)
-	      rep2 = newproxy.read(some_otherpath)
-	      # do some work
+         with protocol.clone(shared_proxy, persistent=True) as newproxy:
+             rep1 = newproxy.read(some_path)
+             rep2 = newproxy.read(some_otherpath)
+             # do some work
 
-      owproxy = protocol.proxy(persistent=False)
-      for i in range(NUM_THREADS):
-          th = threading.Thread(target=worker, args=(owproxy, ))
-	  th.start()
+     owproxy = protocol.proxy(persistent=False)
+     for i in range(NUM_THREADS):
+         th = threading.Thread(target=worker, args=(owproxy, ))
+         th.start()
 
    Of course, is persistence is not needed, the code
-   could be more simple: ::
+   could be more simple::
 
      from pyownet import protocol
 
      def worker(shared_proxy):
          rep1 = shared_proxy.read(some_path)
-	 rep2 = shared_proxy.read(some_otherpath)
-	 # do some work
+         rep2 = shared_proxy.read(some_otherpath)
+         # do some work
 
-      owproxy = protocol.proxy(persistent=False)
-      for i in range(NUM_THREADS):
-          th = threading.Thread(target=worker, args=(owproxy, ))
-	  th.start()
+     owproxy = protocol.proxy(persistent=False)
+     for i in range(NUM_THREADS):
+         th = threading.Thread(target=worker, args=(owproxy, ))
+         th.start()
 
 
 Proxy objects
@@ -163,13 +163,15 @@ functions.
 
       returns a list of the pathnames of the entities that are direct
       descendants of the node at *path*, which has to be a
-      directory. ::
+      directory.
 
-	>>> p = protocol.proxy()
-	>>> p.dir('/')
-	[u'/10.A7F1D92A82C8/', u'/05.D8FE434D9855/', u'/26.8CE2B3471711/', u'/01.98542F112D05/']
-	>>> p.dir('/01.98542F112D05/')
-	[u'/01.98542F112D05/address', u'/01.98542F112D05/alias', u'/01.98542F112D05/crc8', u'/01.98542F112D05/family', u'/01.98542F112D05/id', u'/01.98542F112D05/locator', u'/01.98542F112D05/r_address', u'/01.98542F112D05/r_id', u'/01.98542F112D05/r_locator', u'/01.98542F112D05/type']
+      ::
+
+        >>> p = protocol.proxy()
+        >>> p.dir('/')
+        [u'/10.A7F1D92A82C8/', u'/05.D8FE434D9855/', u'/26.8CE2B3471711/', u'/01.98542F112D05/']
+        >>> p.dir('/01.98542F112D05/')
+        [u'/01.98542F112D05/address', u'/01.98542F112D05/alias', u'/01.98542F112D05/crc8', u'/01.98542F112D05/family', u'/01.98542F112D05/id', u'/01.98542F112D05/locator', u'/01.98542F112D05/r_address', u'/01.98542F112D05/r_id', u'/01.98542F112D05/r_locator', u'/01.98542F112D05/type']
 
       If ``slash=True`` the pathnames of directories are marked by a
       trailing slash. If ``bus=True`` also special directories (like
@@ -178,11 +180,13 @@ functions.
    .. py:method:: read(path, size=MAX_PAYLOAD, offset=0)
 
       returns the data read from node at path, which has not to be a
-      directory. ::
+      directory.
 
-	>>> p = protocol.proxy()
-	>>> p.read('/01.98542F112D05/type')
-	'DS2401'
+      ::
+
+        >>> p = protocol.proxy()
+        >>> p.read('/01.98542F112D05/type')
+        'DS2401'
 
       The ``size`` parameters can be specified to limit the maximum
       length of the data buffer returned; when ``offset > 0`` the
@@ -193,10 +197,12 @@ functions.
    .. py:method:: write(path, data, offset=0)
 
       writes binary ``data`` to node at path; when ``offset > 0`` data
-      is written starting at byte offset ``offset`` in ``path``. ::
+      is written starting at byte offset ``offset`` in ``path``.
 
-	>>> p = protocol.proxy()
-	>>> p.write('01.98542F112D05/alias', b'aaa')
+      ::
+
+        >>> p = protocol.proxy()
+        >>> p.write('01.98542F112D05/alias', b'aaa')
 
    .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0)
 
@@ -213,25 +219,27 @@ functions.
 
       The method returns a ``(retcode, data)`` tuple, where
       ``retcode`` is the server return code (< 0 in case of error) and
-      ``data`` the binary payload of the reply message. ::
+      ``data`` the binary payload of the reply message.
 
-	>>> p = protocol.proxy()
-	>>> p.sendmess(MSG_DIRALL, '/', flags=FLG_BUS_RET)
-	(0, '/10.A7F1D92A82C8,/05.D8FE434D9855,/26.8CE2B3471711,/01.98542F112D05,/bus.0,/uncached,/settings,/system,/statistics,/structure,/simultaneous,/alarm')
-	>>> p.sendmess(MSG_DIRALL, '/nonexistent')
-	(-1, '')
+      ::
+
+        >>> p = protocol.proxy()
+        >>> p.sendmess(MSG_DIRALL, '/', flags=FLG_BUS_RET)
+        (0, '/10.A7F1D92A82C8,/05.D8FE434D9855,/26.8CE2B3471711,/01.98542F112D05,/bus.0,/uncached,/settings,/system,/statistics,/structure,/simultaneous,/alarm')
+        >>> p.sendmess(MSG_DIRALL, '/nonexistent')
+        (-1, '')
 
 .. py:class:: _PersistentProxy
 
    Objects of this class follow the persistent protocol, reusing the
-   same socket connection for more than one method
-   call. :class:`_PersistentProxy` instances are created with a closed
-   connection to the owserver. When a method is called, it firsts
-   check for an open connection: if none is found a socket is created
-   and bound to the owserver. All messages are sent to the server with
-   the :const:`FLG_PERSISTENCE` flag set; if the server grants
-   persistence, the socket is kept open, otherwise the socket is shut
-   down before the method return.
+   same socket connection for more than one method call.  When a
+   method is called, it firsts check for an open connection: if none
+   is found a socket is created and bound to the owserver. All
+   messages are sent to the server with the :const:`FLG_PERSISTENCE`
+   flag set; if the server grants persistence, the socket is kept
+   open, otherwise the socket is shut down as for :class:`_Proxy`
+   instances. In other terms if persistence is not granted there is an
+   automatic fallback to the non persistent protocol.
 
    The use of the persistent protocol is therefore transparent to the
    user, with an important difference: if persistence is granted by
@@ -253,25 +261,29 @@ functions.
    still be used: in fact a new method call will open a new socket
    connection.
 
-   To facilitate the use of the :meth:`close_connection`, method
-   :class:`_PersistentProxy` objects support the context management
-   protocol (i.e. the `with
+   To avoid the need of explicitly calling the
+   :meth:`close_connection` method, :class:`_PersistentProxy`
+   instances support the context management protocol (i.e. the `with
    <https://docs.python.org/2.7/reference/compound_stmts.html#the-with-statement>`_
-   statement.) When the ``with`` block is entered a socket connections
+   statement.) When the ``with`` block is entered a socket connection
    is opened; the same socket connection is closed at the exit of the
-   block. A typical usage pattern could be the following. ::
+   block. A typical usage pattern could be the following::
 
      owproxy = protocol.proxy(persistent=True)
 
      with owproxy:
-	 # call methods of owproxy
-	 ...
+         # here socket is bound to owserver
+         # do work which requires to call owproxy methods
+         res = owproxy.dir()
+         # etc.
 
-     # do some work which does not require owproxy
+     # here socket is closed
+     # do work that does not require owproxy access
 
      with owproxy:
-	 # call methods of owproxy
-	 ...
+         # again a connection is open
+         res = owproxy.dir()
+         # etc.
 
    In the above example, outside of the ``with`` blocks all socket
    connections to the owserver are guaranteed to be closed. Moreover
