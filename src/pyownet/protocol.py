@@ -316,8 +316,11 @@ class _OwnetConnection(object):
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
-    def __del__(self):
-        self.socket.close()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
 
     def __str__(self):
         return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
@@ -334,10 +337,7 @@ class _OwnetConnection(object):
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
             pass
-        # FIXME: socket.close() moved to __del__();
-        # this is to avoid open sockets if shutdown is not called
-        # should instead enforce call to shutdown in _Proxy...?
-        # self.socket.close()
+        self.socket.close()
 
     def req(self, msgtype, payload, flags, size=0, offset=0):
         """send message to server and return response"""
@@ -476,11 +476,11 @@ class _Proxy(object):
         assert not (flags & FLG_PERSISTENCE)
 
         try:
-            conn = _OwnetConnection(self._sockaddr, self._family, self.verbose)
-            ret, _, data = conn.req(msgtype, payload, flags, size, offset)
+            with _OwnetConnection(
+                    self._sockaddr, self._family, self.verbose) as conn:
+                ret, _, data = conn.req(msgtype, payload, flags, size, offset)
         except IOError as err:
             raise ConnError(*err.args)
-        conn.shutdown()
 
         return ret, data
 
@@ -570,6 +570,9 @@ class _PersistentProxy(_Proxy):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close_connection()
+
+    def __del__(self):
         self.close_connection()
 
     def _open_connection(self):

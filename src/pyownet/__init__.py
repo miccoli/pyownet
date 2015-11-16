@@ -17,9 +17,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['__version__', ]
-__version__ = '0.8.3.dev1'
+__all__ = ['__version__', 'Error']
+__version__ = '0.8.3.dev2'
 
 
 class Error(Exception):
-    """Base class for all package errors"""
+    """Base class for all pyownet errors"""
