@@ -3,7 +3,7 @@
 This small example shows how to implement a work-a-like of owget
 (which is a C program in module owshell from owfs).
 
-This implementation is for python 2.X
+This implementation is for python 2 and 3
 
 This programs parses an owserver URI, constructed in the obvious way:
 'owserver://hostname:port/path' and prints the corresponding state.
@@ -50,7 +50,7 @@ def main():
 
     # positional args
     parser.add_argument('uri', metavar='URI', nargs='?', default='/',
-                        help='[owserver:]//server:port/entity')
+                        help='[owserver:]//server:port/path')
 
     # optional args for temperature scale
     parser.set_defaults(t_flags=protocol.FLG_TEMP_C)
@@ -81,8 +81,11 @@ def main():
                         help='format for 1-wire unique serial IDs display')
 
     # optional arg for output format
-    parser.add_argument('--hex', action='store_true',
-                        help='write read data in hex format')
+    tempg = parser.add_mutually_exclusive_group()
+    tempg.add_argument('--hex', action='store_true',
+                       help='write data in hex format')
+    tempg.add_argument('-b', '--binary', action='store_true',
+                       help='output binary data')
 
     #
     # parse command line args
@@ -113,13 +116,19 @@ def main():
 
     try:
         if urlc.path.endswith('/'):
-            for entity in owproxy.dir(urlc.path, bus=True):
-                print(entity)
+            for path in owproxy.dir(urlc.path, bus=True):
+                print(path)
         else:
             data = owproxy.read(urlc.path)
-            if args.hex:
-                data = hexlify(data)
-            print(data, end='')
+            if args.binary:
+                if sys.version_info < (3, ):
+                    sys.stdout.write(data)
+                else:
+                    sys.stdout.buffer.write(data)
+            else:
+                if args.hex:
+                    data = hexlify(data)
+                print(data.decode('ascii', errors='backslashreplace'))
     except protocol.OwnetError as error:
         parser.exit(status=1, message=str(error)+'\n')
 

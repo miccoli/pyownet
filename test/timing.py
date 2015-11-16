@@ -17,7 +17,7 @@ def main():
         scale = 1e3  # report times in ms
         print('** {:15}'.format(name), end=':')
         for t in (sorted(res)):
-            print(' {:5.2f} ms'.format(t / number * scale), end=',')
+            print(' {:6.3f} ms'.format(t / number * scale), end=',')
         print()
 
     parser = argparse.ArgumentParser()
@@ -42,8 +42,7 @@ def main():
     port = urlc.port or 4304
     path = urlc.path or '/'
 
-    print('pyownet: ver. {} ({})'.format(pyownet.__version__,
-                                         pyownet.__file__))
+    print(pyownet.__name__, pyownet.__version__, pyownet.__file__)
 
     try:
         base = protocol.proxy(host, port, persistent=False)
