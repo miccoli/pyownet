@@ -7,7 +7,7 @@ pyownet, a pure python owserver client library
    :target: http://pyownet.readthedocs.org/en/latest/
    :alt: Package Documentation
 
-pyownet is a pure python package that allows access to an `owserver`_
+pyownet is a pure python package that allows client access to an `owserver`_
 via the `owserver network protocol`_, in short *ownet*.
 
 owserver is part of the `OWFS 1-Wire File System`_:
@@ -20,7 +20,7 @@ owserver is part of the `OWFS 1-Wire File System`_:
     flash lights, write to an LCD, log and graph, ...
 
 The ``pyownet.protocol`` module is a low-level implementation of the
-owserver protocol. Interaction with an owserver takes place via a proxy
+owserver client protocol. Interaction with an owserver takes place via a proxy
 object whose methods correspond to owserver messages:
 
 ::
@@ -31,7 +31,7 @@ object whose methods correspond to owserver messages:
     >>> owproxy.read('/10.67C6697351FF/temperature')
     '     91.6195'
 
-Python 3 is supported via ``2to3`` and ``use_2to3 = True`` in
+Python 3 is fully supported via ``2to3`` and ``use_2to3 = True`` in
 ``setup.py``.
 
 .. _owserver: http://owfs.org/index.php?page=owserver_protocol

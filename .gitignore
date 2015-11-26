@@ -8,3 +8,7 @@ __pycache__/
 
 # tox
 .tox
+
+# docutil generated
+README.html
+CHANGELOG.html

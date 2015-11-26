@@ -18,8 +18,8 @@
 #
 
 __all__ = ['__version__', 'Error']
-__version__ = '0.8.3.dev2'
+__version__ = '0.8.3.dev3'
 
 
 class Error(Exception):
-    """Base class for all pyownet errors"""
+    """Base class for all package errors"""

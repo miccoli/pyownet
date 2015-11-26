@@ -42,7 +42,7 @@ import warnings
 import struct
 import socket
 
-import pyownet
+from . import Error as _Error
 
 #
 # owserver protocol related constants
@@ -108,7 +108,7 @@ PTH_VERSION = '/system/configuration/version'
 PTH_PID = '/system/process/pid'
 
 #
-# pyownet implementation specific constants
+# implementation specific constants
 #
 
 # do not attempt to read messages bigger than this (bytes)
@@ -149,7 +149,7 @@ def bytes2str(b):
 # exceptions
 #
 
-class Error(pyownet.Error):
+class Error(_Error):
     """Base class for all module errors."""
 
 
@@ -637,7 +637,8 @@ class OwnetProxy(_Proxy):
         """
 
         # this class will be deprecated in version 0.9.x
-        warnings.warn(PendingDeprecationWarning("Please use pyownet.proxy()"))
+        warnings.warn(PendingDeprecationWarning(
+            "Please use {0}.proxy()".format(__name__)))
 
         # save init args
         self.flags = flags | FLG_OWNET
