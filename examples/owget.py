@@ -1,10 +1,5 @@
 """owget.py -- a pyownet implementation of owget
 
-This small example shows how to implement a work-a-like of owget
-(which is a C program in module owshell from owfs).
-
-This implementation is for python 2 and 3
-
 This programs parses an owserver URI, constructed in the obvious way:
 'owserver://hostname:port/path' and prints the corresponding state.
 If 'path' ends with a slash a DIR operation is executed, otherwise a READ.
@@ -50,7 +45,7 @@ def main():
 
     # positional args
     parser.add_argument('uri', metavar='URI', nargs='?', default='/',
-                        help='[owserver:]//server:port/path')
+                        help='[owserver:]//hostname:port/path')
 
     # optional args for temperature scale
     parser.set_defaults(t_flags=protocol.FLG_TEMP_C)
@@ -96,14 +91,18 @@ def main():
     # parse args.uri and substitute defaults
     #
     urlc = urlsplit(args.uri, scheme='owserver', allow_fragments=False)
+    assert urlc.fragment == ''
     if urlc.scheme != 'owserver':
-        parser.error("Invalid URI scheme '{}:'".format(urlc.scheme))
-    assert not urlc.fragment
+        parser.error("Invalid URI scheme '{0}:'".format(urlc.scheme))
     if urlc.query:
-        parser.error(
-            "Invalid URI '{}', no query component allowed".format(args.uri))
-    host = urlc.hostname or 'localhost'
-    port = urlc.port or 4304
+        parser.error("Invalid URI, query component '?{0}' not allowed"
+                     .format(urlc.query))
+    try:
+        host = urlc.hostname or 'localhost'
+        port = urlc.port or 4304
+    except ValueError as error:
+        parser.error("Invalid URI: invalid net location '//{0}/'"
+                     .format(urlc.netloc))
 
     #
     # create owserver proxy object
@@ -111,8 +110,14 @@ def main():
     try:
         owproxy = protocol.proxy(
             host, port, flags=args.t_flags | fcodes[args.format], )
-    except (protocol.ConnError, protocol.ProtocolError) as error:
-        parser.exit(status=1, message=str(error)+'\n')
+    except protocol.ConnError as error:
+        print("Unable to open connection to '{0}:{1}'\n{2}"
+              .format(host, port, error), file=sys.stderr)
+        sys.exit(1)
+    except protocol.ProtocolError as error:
+        print("Protocol error, '{0}:{1}' not an owserver?\n{2}"
+              .format(host, port, error), file=sys.stderr)
+        sys.exit(1)
 
     try:
         if urlc.path.endswith('/'):
@@ -130,7 +135,13 @@ def main():
                     data = hexlify(data)
                 print(data.decode('ascii', errors='backslashreplace'))
     except protocol.OwnetError as error:
-        parser.exit(status=1, message=str(error)+'\n')
+        print("Ownet error\n{2}"
+              .format(host, port, error), file=sys.stderr)
+        sys.exit(1)
+    except protocol.ProtocolError as error:
+        print("Protocol error, '{0}:{1}' buggy?\n{2}"
+              .format(host, port, error), file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
