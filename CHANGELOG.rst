@@ -2,6 +2,9 @@ Changelog
 =========
 
 v0.8.3 (devel)
+  * better connection logic in ``pyownet.protocol.proxy()`` factory:
+    first connect or raise ``protocol.ConnError``,
+    then test owserver protocol or raise ``protocol.ProtocolError``
   * use relative imports in ``pyownet.protocol``
   * ``./test`` and ``./examples`` minor code refactor
   * ``.gitignore`` cleanup (use only project specific ignores)

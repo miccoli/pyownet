@@ -78,6 +78,10 @@ Functions
    :param bool verbose: if true, print on ``sys.stdout`` debugging messages
                         related to the owserver protocol.
    :return: proxy object
+   :raises ConnError: if no connection can be established with
+                      ``host`` at ``port``.
+   :raises ProtocolError: if a connection can be established but the server
+                          does not support the owserver protocol.
 
    Proxy objects are created by this factory function; for
    ``persistent=False`` will be of class :class:`_Proxy` or

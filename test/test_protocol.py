@@ -117,10 +117,15 @@ class Test_misc(unittest.TestCase):
     def test_exceptions(self):
         self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
                           host='nonexistent.fake')
+        self.assertRaises(protocol.ConnError, protocol.proxy,
+                          host='nonexistent.fake')
+        self.assertRaises(protocol.ConnError, protocol.proxy,
+                          host=HOST, port=-1)
+        self.assertRaises(protocol.ProtocolError, protocol.proxy,
+                          host='www.google.com', port=80)
+        self.assertRaises(TypeError, protocol.clone, 1)
         self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
         self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
-        self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
-        self.assertRaises(TypeError, protocol.clone, 1)
 
 if __name__ == '__main__':
     unittest.main()

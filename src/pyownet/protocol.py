@@ -694,11 +694,6 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     host, port.
     """
 
-    if persistent:
-        pclass = _PersistentProxy
-    else:
-        pclass = _Proxy
-
     # resolve host name/port
     try:
         gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
@@ -709,12 +704,11 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     lasterr = None
     for (family, _, _, _, sockaddr) in gai:
         try:
-            owp = pclass(family, sockaddr, flags, verbose)
-            owp.ping()
+            owp = _PersistentProxy(family, sockaddr, flags, verbose)
+            owp.__enter__()
         except ConnError as err:
             # not working, go over to next sockaddr
             lasterr = err
-            # fixme: should release owp resources?
         else:
             # ok, this is working, stop searching
             break
@@ -723,8 +717,19 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
         assert isinstance(lasterr, ConnError)
         raise lasterr
 
-    # fixme: should this be only optional?
-    owp._init_errcodes()
+    with owp:
+        try:
+            # fixme: should this be only optional?
+            owp._init_errcodes()
+        except ConnError as err:
+            raise ProtocolError('Error while connecting to owserver: {}'
+                                .format(err))
+        except ProtocolError as err:
+            # pass ProtocolError unchanged
+            raise err
+
+    if not persistent:
+        owp = clone(owp, persistent=False)
 
     return owp
 
