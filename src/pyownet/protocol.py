@@ -37,7 +37,6 @@ correspond to owserver messages. Proxy objects are created by factory function
 
 from __future__ import print_function
 
-import sys
 import warnings
 import struct
 import socket
@@ -368,47 +367,26 @@ class _OwnetConnection(object):
         assert sent == len(header + payload), sent
 
     #
-    # implementation of _read_socket is version dependent
-    #
     # NOTE:
     # '_read_socket(self, nbytes)' was implemented as
     # 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
     # but socket.MSG_WAITALL proved not reliable
+    #
 
-    if sys.version_info < (2, 7, 6, ):
-        # legacy python support, will be dropped in the future
+    def _read_socket(self, nbytes):
+        """read nbytes bytes from self.socket"""
 
-        def _read_socket(self, nbytes):
-            """read nbytes bytes from self.socket"""
-
-            buf = ''
-            while len(buf) < nbytes:
-                tmp = self.socket.recv(nbytes)
-                if len(tmp) == 0:
-                    if self.verbose:
-                        print('ee', repr(buf))
-                    raise ShortRead("short read: read %d bytes instead of %d"
-                                    % (len(buf), nbytes, ))
-                buf += tmp
-            return buf
-
-    else:
-        # python >= 2.7.6 and 3.x
-
-        def _read_socket(self, nbytes):
-            """read nbytes bytes from self.socket"""
-
-            buf = bytearray(nbytes)
-            view = memoryview(buf)
-            while nbytes:
-                nread = self.socket.recv_into(view[-nbytes:])
-                if nread == 0:
-                    if self.verbose:
-                        print('ee', repr(buf[:-nbytes]))
-                    raise ShortRead("short read: read %d bytes instead of %d"
-                                    % (len(view) - nbytes, len(view), ))
-                nbytes -= nread
-            return buf
+        buf = self.socket.recv(nbytes)
+        while len(buf) < nbytes:
+            tmp = self.socket.recv(nbytes - len(buf))
+            if len(tmp) == 0:
+                if self.verbose and buf:
+                    print('ee', repr(buf))
+                raise ShortRead("short read: read %d bytes instead of %d"
+                                % (len(buf), nbytes, ))
+            buf += tmp
+        assert len(buf) == nbytes, (buf, len(buf), nbytes)
+        return buf
 
     def _read_msg(self):
         """read message from server"""

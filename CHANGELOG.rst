@@ -2,6 +2,11 @@ Changelog
 =========
 
 v0.8.3 (devel)
+  * ``pyownet.protocol._OwnetConnection.req()`` returns ``bytes`` and not
+    ``bytearray``
+
+    This is due to a simplification in
+    ``pyownet.protocol._OwnetConnection._read_socket()`` method.
   * better connection logic in ``pyownet.protocol.proxy()`` factory:
     first connect or raise ``protocol.ConnError``,
     then test owserver protocol or raise ``protocol.ProtocolError``
