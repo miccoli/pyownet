@@ -2,6 +2,8 @@ Changelog
 =========
 
 v0.8.3 (devel)
+  * create a diagnostics directory ``./diags``
+  * move test suite from ``./test`` to ``./tests``
   * ``pyownet.protocol._OwnetConnection.req()`` returns ``bytes`` and not
     ``bytearray``
 

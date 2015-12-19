@@ -53,12 +53,12 @@ def stress(owproxy, root):
     tic = time.time()
     n = walkdir(root)
     toc = time.time()
-    print('walkdir({}) : {:.3f} - {:d}'.format(root, toc - tic, n))
+    print('walkdir({}) : {:.3f}s for {:d} nodes'.format(root, toc - tic, n))
 
     tic = time.time()
     n = walkread(root)
     toc = time.time()
-    print('walkread({}): {:.3f} - {:d}'.format(root, toc - tic, n))
+    print('walkread({}): {:.3f}s for {:d} nodes'.format(root, toc - tic, n))
 
 
 def main():

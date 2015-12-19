@@ -10,5 +10,6 @@ __pycache__/
 .tox
 
 # docutil generated
-README.html
-CHANGELOG.html
+/README.html
+/CHANGELOG.html
+/TODO.html

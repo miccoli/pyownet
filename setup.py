@@ -42,6 +42,6 @@ setup(
     ],
     package_dir = {'': 'src'},
     packages = ['pyownet', ],
-    test_suite = "test.test_protocol",
+    test_suite = "tests.test_protocol",
     use_2to3 = True,
 )
