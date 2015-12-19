@@ -34,7 +34,7 @@ allows to access a 1-Wire bus via a supported master device. OWFS
 comprises many different modules which offer different access
 protocols to 1-Wire data: ``owhttpd`` (http), ``owftpd`` (ftp) and
 ``owfs`` (filesystem interface via FUSE). Since only a single program
-can access the 1-Wire bus at one time, there is also backend
+can access the 1-Wire bus at one time, there is also a back end
 component, ``owserver``, that arbitrates access to the bus from
 multiple client processes. Client processes can query an ``owserver``
 (the program) via network sockets speaking the 'owserver'

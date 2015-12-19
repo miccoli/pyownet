@@ -7,8 +7,8 @@
 
 .. warning::
 
-   This software is still in alpha testing. Altough it has been
-   sucessfully used in production environments for more than 4 years,
+   This software is still in alpha testing. Although it has been
+   successfully used in production environments for more than 4 years,
    its API is not frozen yet, and could be changed.
 
 The :mod:`pyownet.protocol` module is a low-level implementation of
@@ -21,9 +21,9 @@ owserver protocol messages.
   >>> from pyownet import protocol
   >>> owproxy = protocol.proxy(host="server.example.com", port=4304)
   >>> owproxy.dir()
-  [u'/10.A7F1D92A82C8/', u'/05.D8FE434D9855/', u'/26.8CE2B3471711/']
-  >>> owproxy.read('/10.A7F1D92A82C8/temperature')
-  '     6.68422'
+  ['/10.000010EF0000/', '/05.000005FA0100/', '/26.000026D90200/', '/01.000001FE0300/', '/43.000043BC0400/']
+  >>> owproxy.read('/10.000010EF0000/temperature')
+  b'         1.6'
 
 .. _persistence:
 
@@ -51,7 +51,7 @@ Correspondingly two different proxy object classes are implemented:
 
 * *Persistent* proxy objects are not thread safe, in the sense that
   the same object cannot be used concurrently by different threads. If
-  multithread use is desired, it is responsibility of the user to
+  multithreaded use is desired, it is responsibility of the user to
   implement a proper locking mechanism.  On the first call to a
   method, a socket is bound to the owserver and kept open for reuse in
   the subsequent calls. It is responsibility of the user to explicitly
@@ -78,10 +78,10 @@ Functions
    :param bool verbose: if true, print on ``sys.stdout`` debugging messages
                         related to the owserver protocol.
    :return: proxy object
-   :raises ConnError: if no connection can be established with
-                      ``host`` at ``port``.
-   :raises ProtocolError: if a connection can be established but the server
-                          does not support the owserver protocol.
+   :raises pyownet.protocol.ConnError: if no connection can be established
+        with ``host`` at ``port``.
+   :raises pyownet.protocol.ProtocolError: if a connection can be established
+        but the server does not support the owserver protocol.
 
    Proxy objects are created by this factory function; for
    ``persistent=False`` will be of class :class:`_Proxy` or
@@ -100,7 +100,7 @@ Functions
    functions is to quickly create a new proxy object with the same
    properties of the old one, with only the persistence parameter
    changed. Typically this can be useful if one desires to use
-   persistent connections in a multi-threaded environment, as per
+   persistent connections in a multithreaded environment, as per
    the example below::
 
      from pyownet import protocol
@@ -154,43 +154,66 @@ functions.
 
    .. py:method:: ping()
 
-      sends a *ping* message to owserver and returns ``None``. This is
-      actually a no-op, and no response is expected; this method could
-      be used for verifying that a given server is accepting
-      connections.
+       Send a *ping* message to owserver.
+
+       :return: ``None``
+
+       This is actually a no-op; this method could
+       be used for verifying that a given server is accepting
+       connections and alive.
 
    .. py:method:: present(path)
 
-      returns ``True`` if an entity is present at *path*.
+      Check if a node is present at path.
+
+      :param str path: OWFS path
+      :return: ``True`` if an entity is present at path, ``False`` otherwise
+      :rtype: bool
+
 
    .. py:method:: dir(path='/', slash=True, bus=False)
 
-      returns a list of the pathnames of the entities that are direct
+      List directory content
+
+      :param str path: OWFS path to list
+      :param bool slash: ``True`` if directories should be marked with a
+                         trailing slash
+      :param bool bus: ``True`` if special directories should be listed
+      :return: directory content
+      :rtype: list
+
+      Return a list of the pathnames of the entities that are direct
       descendants of the node at *path*, which has to be a
-      directory.
+      directory::
 
-      ::
-
-        >>> p = protocol.proxy()
-        >>> p.dir('/')
-        [u'/10.A7F1D92A82C8/', u'/05.D8FE434D9855/', u'/26.8CE2B3471711/', u'/01.98542F112D05/']
-        >>> p.dir('/01.98542F112D05/')
-        [u'/01.98542F112D05/address', u'/01.98542F112D05/alias', u'/01.98542F112D05/crc8', u'/01.98542F112D05/family', u'/01.98542F112D05/id', u'/01.98542F112D05/locator', u'/01.98542F112D05/r_address', u'/01.98542F112D05/r_id', u'/01.98542F112D05/r_locator', u'/01.98542F112D05/type']
+        >>> owproxy = protocol.proxy()
+        >>> owproxy.dir()
+        ['/10.000010EF0000/', '/05.000005FA0100/', '/26.000026D90200/', '/01.000001FE0300/', '/43.000043BC0400/']
+        >>> owproxy.dir('/10.000010EF0000/')
+        ['/10.000010EF0000/address', '/10.000010EF0000/alias', '/10.000010EF0000/crc8', '/10.000010EF0000/errata/', '/10.000010EF0000/family', '/10.000010EF0000/id', '/10.000010EF0000/locator', '/10.000010EF0000/power', '/10.000010EF0000/r_address', '/10.000010EF0000/r_id', '/10.000010EF0000/r_locator', '/10.000010EF0000/scratchpad', '/10.000010EF0000/temperature', '/10.000010EF0000/temphigh', '/10.000010EF0000/templow', '/10.000010EF0000/type']
 
       If ``slash=True`` the pathnames of directories are marked by a
       trailing slash. If ``bus=True`` also special directories (like
-      ``/settings/``, ``/structure/``, ``/uncached/``) are listed.
+      ``'/settings'``, ``'/structure'``, ``'/uncached'``) are listed.
 
    .. py:method:: read(path, size=MAX_PAYLOAD, offset=0)
 
-      returns the data read from node at path, which has not to be a
+      Read node at path
+
+      :param str path: OWFS path
+      :param int size: maximum length of data read
+      :param int offset: offset at which read data
+      :return: binary buffer
+      :rtype: bytes
+
+      Return the data read from node at path, which has not to be a
       directory.
 
       ::
 
-        >>> p = protocol.proxy()
-        >>> p.read('/01.98542F112D05/type')
-        'DS2401'
+        >>> owproxy = protocol.proxy()
+        >>> owproxy.read('/10.000010EF0000/type')
+        b'DS18S20'
 
       The ``size`` parameters can be specified to limit the maximum
       length of the data buffer returned; when ``offset > 0`` the
@@ -200,19 +223,36 @@ functions.
 
    .. py:method:: write(path, data, offset=0)
 
-      writes binary ``data`` to node at path; when ``offset > 0`` data
+      Write data at path.
+
+      :param str path: OWFS path
+      :param bytes data: binary data to write
+      :param int offset: offset at which write data
+      :return: ``None``
+
+      Writes binary ``data`` to node at ``path``; when ``offset > 0`` data
       is written starting at byte offset ``offset`` in ``path``.
 
       ::
 
-        >>> p = protocol.proxy()
-        >>> p.write('01.98542F112D05/alias', b'aaa')
+        >>> owproxy = protocol.proxy()
+        >>> owproxy.write('/10.000010EF0000/alias', b'myalias')
 
    .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0)
 
-      is a low level method meant as direct interface to the *owserver
-      protocol* useful for generating messages which are not covered
-      by the other higher level methods of this class.
+      Send message to owserver.
+
+      :param int msgtype: message type code
+      :param bytes payload: message payload
+      :param int flags: message flags
+      :param size int: message size
+      :param offset int: message offset
+      :return: owserver return code and reply data
+      :rtype: ``(int, bytes)`` tuple
+
+      This is a low level method meant as direct interface to the
+      *owserver protocol,* useful for generating messages which are not
+      covered by the other higher level methods of this class.
 
       This method sends a message of type ``msgtype`` (see
       :ref:`msgtypes`) with a given ``payload`` to the server;
@@ -227,11 +267,11 @@ functions.
 
       ::
 
-        >>> p = protocol.proxy()
-        >>> p.sendmess(MSG_DIRALL, '/', flags=FLG_BUS_RET)
-        (0, '/10.A7F1D92A82C8,/05.D8FE434D9855,/26.8CE2B3471711,/01.98542F112D05,/bus.0,/uncached,/settings,/system,/statistics,/structure,/simultaneous,/alarm')
-        >>> p.sendmess(MSG_DIRALL, '/nonexistent')
-        (-1, '')
+        >>> owproxy = protocol.proxy()
+        >>> owproxy.sendmess(protocol.MSG_DIRALL, b'/', flags=protocol.FLG_BUS_RET)
+        (0, b'/10.000010EF0000,/05.000005FA0100,/26.000026D90200,/01.000001FE0300,/43.000043BC0400,/bus.0,/uncached,/settings,/system,/statistics,/structure,/simultaneous,/alarm')
+        >>> owproxy.sendmess(protocol.MSG_DIRALL, b'/nonexistent')
+        (-1, b'')
 
 .. py:class:: _PersistentProxy
 
@@ -268,7 +308,7 @@ functions.
    To avoid the need of explicitly calling the
    :meth:`close_connection` method, :class:`_PersistentProxy`
    instances support the context management protocol (i.e. the `with
-   <https://docs.python.org/2.7/reference/compound_stmts.html#the-with-statement>`_
+   <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>`_
    statement.) When the ``with`` block is entered a socket connection
    is opened; the same socket connection is closed at the exit of the
    block. A typical usage pattern could be the following::
@@ -295,16 +335,90 @@ functions.
    before the first call to a method, which could be useful for error
    handling.
 
+   For non-persistent connection entering and exiting the ``with``
+   block context is a no-op.
+
+
+Exceptions
+----------
+
+Base classes
+^^^^^^^^^^^^
+
+.. py:exception:: Error
+
+   The base class for all exceptions raised by this module.
+
+Concrete exceptions
+^^^^^^^^^^^^^^^^^^^
+
+.. py:exception:: OwnetError
+
+   This exception is raised to signal an error return code by the
+   owserver. This exception inherits also from the builtin `OSError`_
+   and follows its semantics: it sets arguments ``errno``,
+   ``strerror``, and, if available, ``filename``. Message errors are
+   derived from the owserver introspection, by consulting the
+   ``/settings/return_codes/text.ALL`` node.
+
+.. _OSError: https://docs.python.org/3/library/exceptions.html#OSError
+
+.. py:exception:: ConnError
+
+   This exception is raised when a network connection to the owserver
+   cannot be established. In fact it wraps the causing `OSError`_
+   exception along with all its arguments, from which it inherits.
+
+.. py:exception:: ProtocolError
+
+   This exception is raised when a successful network connection is
+   established, but the remote server does not speak the owserver
+   network protocol or some other error occurred during the exchange
+   of owserver messages.
+
+.. py:exception:: MalformedHeader
+
+   A subclass of :exc:`ProtocolError`: raised when it is impossible to
+   decode the reply header received from the remote owserver.
+
+.. py:exception:: ShortRead
+
+   A subclass of :exc:`ProtocolError`: raised when the payload
+   received from the remote owserver is too short.
+
+.. py:exception:: ShortWrite
+
+   A subclass of :exc:`ProtocolError`: raised when it is impossible to
+   send the complete payload to the remote owserver.
+
+
+
+Exception hierarchy
+^^^^^^^^^^^^^^^^^^^
+
+The exception class hierarchy for this module is:
+
+.. code-block:: none
+
+   pyownet.Error
+    +-- pyownet.protocol.Error
+         +-- pyownet.protocol.OwnetError
+         +-- pyownet.protocol.ConnError
+         +-- pyownet.protocol.ProtocolError
+              +-- pyownet.protocol.MalformedHeader
+              +-- pyownet.protocol.ShortRead
+              +-- pyownet.protocol.ShortWrite
+
 
 Constants
 ---------
 
 .. py:data:: MAX_PAYLOAD
 
-Defines the maximum number of bytes that this module is willing to
-read in a single message from the remote owserver. This limit is
-enforced to avoid security problems with malformed headers. The limit
-is hardcoded to 65536 bytes. [#alpha]_
+  Defines the maximum number of bytes that this module is willing to
+  read in a single message from the remote owserver. This limit is
+  enforced to avoid security problems with malformed headers. The limit
+  is hardcoded to 65536 bytes. [#alpha]_
 
 .. _msgtypes:
 
@@ -403,7 +517,7 @@ flag                          format
 :py:const:`FLG_FORMAT_FI`     1067C6697351FF
 ============================  ==================
 
-FICD are format designators defined as below:
+FICD are format codes defined as below:
 
 ======  ======================================================
 format  interpretation
