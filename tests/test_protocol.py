@@ -10,7 +10,7 @@ from . import (HOST, PORT)
 
 
 def setUpModule():
-    warnings.simplefilter('ignore', PendingDeprecationWarning)
+    "gloabal setup"
 
 
 class _TestProxyMix(object):
@@ -50,7 +50,9 @@ class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
     @classmethod
     def setUpClass(cls):
         try:
-            cls.proxy = protocol.OwnetProxy(HOST, PORT)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', DeprecationWarning)
+                cls.proxy = protocol.OwnetProxy(HOST, PORT)
         except protocol.ConnError as exc:
             raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
                                     (HOST, PORT, exc))
@@ -115,8 +117,10 @@ class Test_clone_TF(Test_PersistentProxy):
 class Test_misc(unittest.TestCase):
 
     def test_exceptions(self):
-        self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
-                          host='nonexistent.fake')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', DeprecationWarning)
+            self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
+                              host='nonexistent.fake')
         self.assertRaises(protocol.ConnError, protocol.proxy,
                           host='nonexistent.fake')
         self.assertRaises(protocol.ConnError, protocol.proxy,

@@ -8,7 +8,7 @@ if sys.version_info < (3, ):
 else:
     from urllib.parse import (urlsplit, )
 
-from pyownet.protocol import OwnetProxy
+from pyownet.protocol import proxy
 
 
 def main():
@@ -18,7 +18,7 @@ def main():
     port = urlc.port or 4304
     path = urlc.path or '/'
 
-    p = OwnetProxy(host, port, verbose=True)
+    p = proxy(host, port, verbose=True)
 
     while True:
         ret = p.read(path)

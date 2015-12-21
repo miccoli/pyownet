@@ -1,7 +1,14 @@
 Changelog
 =========
 
-v0.8.3 (devel)
+v0.9.0 (release candidate)
+
+  No major new features, API cleanup to ensure that connections are
+  properly closed. Functions that return binary data return ``bytes``.
+
+  * implement dummy context management protocol for ``_Proxy``
+    for consitency with _PersistentProxy
+  * OwnetProxy class deprecated
   * create a diagnostics directory ``./diags``
   * move test suite from ``./test`` to ``./tests``
   * ``pyownet.protocol._OwnetConnection.req()`` returns ``bytes`` and not

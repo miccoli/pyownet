@@ -445,6 +445,12 @@ class _Proxy(object):
             # failed, leave the default empty errcodes
             pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
@@ -615,7 +621,7 @@ class OwnetProxy(_Proxy):
         """
 
         # this class will be deprecated in version 0.9.x
-        warnings.warn(PendingDeprecationWarning(
+        warnings.warn(DeprecationWarning(
             "Please use {0}.proxy()".format(__name__)))
 
         # save init args
