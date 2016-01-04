@@ -3,36 +3,31 @@ from __future__ import print_function
 import atexit
 import time
 import threading
-import os
 import sys
-
 if sys.version_info < (3, ):
-    from ConfigParser import ConfigParser
+    from urlparse import (urlsplit, )
 else:
-    from configparser import ConfigParser
+    from urllib.parse import (urlsplit, )
 
 from pyownet import protocol
-
-
-config = ConfigParser()
-
-config.add_section('server')
-config.set('server', 'host', 'localhost')
-config.set('server', 'port', '4304')
-
-config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
-
-HOST = config.get('server', 'host')
-PORT = config.get('server', 'port')
 
 MTHR = 10
 
 tst = lambda: time.strftime('%T')
+
+
 def log(s):
     print(tst(), s)
 
+
 def main():
-    proxy = protocol.proxy(HOST, PORT, verbose=False)
+    assert len(sys.argv) == 2
+    urlc = urlsplit(sys.argv[1], scheme='owserver', allow_fragments=False)
+    host = urlc.hostname or 'localhost'
+    port = urlc.port or 4304
+    assert not urlc.path or urlc.path == '/'
+
+    proxy = protocol.proxy(host, port, verbose=False)
     pid = ver = ''
     try:
         pid = int(proxy.read('/system/process/pid'))
@@ -67,6 +62,7 @@ def worker(proxy, id):
                 break
             iter += 1
             nap *= 2
+
 
 @atexit.register
 def goodbye():

@@ -20,7 +20,7 @@ but there exist also ethernet or other network adapters.
        1-Wire technology brief from Maxim Integrated
 
    .. _1-Wire Maxim:
-       http://www.maximintegrated.com/en/products/comms/one-wire.html
+       https://www.maximintegrated.com/en/products/digital/one-wire.html
 
    `1-Wire Wikipedia <https://en.wikipedia.org/wiki/1-Wire>`_
        description of the 1-Wire bus system on Wikipedia
@@ -34,7 +34,7 @@ allows to access a 1-Wire bus via a supported master device. OWFS
 comprises many different modules which offer different access
 protocols to 1-Wire data: ``owhttpd`` (http), ``owftpd`` (ftp) and
 ``owfs`` (filesystem interface via FUSE). Since only a single program
-can access the 1-Wire bus at one time, there is also backend
+can access the 1-Wire bus at one time, there is also a back end
 component, ``owserver``, that arbitrates access to the bus from
 multiple client processes. Client processes can query an ``owserver``
 (the program) via network sockets speaking the 'owserver'
@@ -137,4 +137,4 @@ A higher-level module :py:mod:`pyownet.sensors` is under development.
 .. rubric:: Footnotes
 
 .. [#pers] For a discussion of this type of keep-alive connection see
-	 :ref:`persistence`.
+         :ref:`persistence`.

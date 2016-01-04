@@ -7,7 +7,7 @@ with open('README.rst') as infile:
 regex = re.compile(
     r"__version__ = (?P<quot>['\"])(?P<ver>[\w.+-]+?)(?P=quot)$", )
 
-with open('pyownet/__init__.py') as infile:
+with open('src/pyownet/__init__.py') as infile:
     for line in infile:
         version_match = regex.match(line)
         if version_match:
@@ -20,7 +20,7 @@ with open('pyownet/__init__.py') as infile:
 setup(
     name = 'pyownet',
     version = __version__,
-    description = 'python ownet client library',
+    description = 'Python OWFS client library (owserver protocol)',
     long_description = long_description,
     author = 'Stefano Miccoli',
     author_email = 'stefano.miccoli@polimi.it',
@@ -31,11 +31,18 @@ setup(
         'Environment :: Other Environment',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
     ],
+    package_dir = {'': 'src'},
     packages = ['pyownet', ],
-    test_suite = "test.test_protocol",
+    test_suite = "tests.test_protocol",
     use_2to3 = True,
 )

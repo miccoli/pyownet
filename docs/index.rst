@@ -15,6 +15,7 @@ Contents
    :maxdepth: 2
 
    intro
+   installation
    protocol
 
 Indices and tables
@@ -22,4 +23,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
-

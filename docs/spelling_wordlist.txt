@@ -1,0 +1,16 @@
+owserver
+indices
+ethernet
+filesystem
+perl
+php
+tcp
+udp
+multithreaded
+ORed
+lookups
+proxied
+pathnames
+hardcoded
+designator
+builtin

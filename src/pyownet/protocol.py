@@ -1,18 +1,15 @@
-"""ownet protocol implementation
+"""owserver protocol implementation
 
-This module is a pure python, low level implementation of the ownet
+This module is a pure python, low level implementation of the owserver
 protocol.
 
 Interaction with an owserver takes place via a proxy object whose methods
-correspond to ownet messages. Proxy objects are created by factory function
+correspond to owserver messages. Proxy objects are created by factory function
 'proxy'.
 
 >>> owproxy = proxy(host="owserver.example.com", port=4304)
->>> owproxy.ping()
 >>> owproxy.dir()
 [u'/10.67C6697351FF/', u'/05.4AEC29CDBAAB/']
->>> owproxy.present('/10.67C6697351FF/temperature')
-True
 >>> owproxy.read('/10.67C6697351FF/temperature')
 '     91.6195'
 >>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
@@ -40,12 +37,11 @@ True
 
 from __future__ import print_function
 
-import sys
 import warnings
 import struct
 import socket
 
-import pyownet
+from . import Error as _Error
 
 #
 # owserver protocol related constants
@@ -111,7 +107,7 @@ PTH_VERSION = '/system/configuration/version'
 PTH_PID = '/system/process/pid'
 
 #
-# pyownet implementation specific constants
+# implementation specific constants
 #
 
 # do not attempt to read messages bigger than this (bytes)
@@ -152,7 +148,7 @@ def bytes2str(b):
 # exceptions
 #
 
-class Error(pyownet.Error):
+class Error(_Error):
     """Base class for all module errors."""
 
 
@@ -319,6 +315,12 @@ class _OwnetConnection(object):
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+
     def __str__(self):
         return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
                                                     self.socket.getpeername())
@@ -365,47 +367,26 @@ class _OwnetConnection(object):
         assert sent == len(header + payload), sent
 
     #
-    # implementation of _read_socket is version dependent
-    #
     # NOTE:
     # '_read_socket(self, nbytes)' was implemented as
     # 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
     # but socket.MSG_WAITALL proved not reliable
+    #
 
-    if sys.version_info < (2, 7, 6, ):
-        # legacy python support, will be dropped in the future
+    def _read_socket(self, nbytes):
+        """read nbytes bytes from self.socket"""
 
-        def _read_socket(self, nbytes):
-            """read nbytes bytes from self.socket"""
-
-            buf = ''
-            while len(buf) < nbytes:
-                tmp = self.socket.recv(nbytes)
-                if len(tmp) == 0:
-                    if self.verbose:
-                        print('ee', repr(buf))
-                    raise ShortRead("short read: read %d bytes instead of %d"
-                                    % (len(buf), nbytes, ))
-                buf += tmp
-            return buf
-
-    else:
-        # python >= 2.7.6 and 3.x
-
-        def _read_socket(self, nbytes):
-            """read nbytes bytes from self.socket"""
-
-            buf = bytearray(nbytes)
-            view = memoryview(buf)
-            while nbytes:
-                nread = self.socket.recv_into(view[-nbytes:])
-                if nread == 0:
-                    if self.verbose:
-                        print('ee', repr(buf[:-nbytes]))
-                    raise ShortRead("short read: read %d bytes instead of %d"
-                                    % (len(view) - nbytes, len(view), ))
-                nbytes -= nread
-            return buf
+        buf = self.socket.recv(nbytes)
+        while len(buf) < nbytes:
+            tmp = self.socket.recv(nbytes - len(buf))
+            if len(tmp) == 0:
+                if self.verbose and buf:
+                    print('ee', repr(buf))
+                raise ShortRead("short read: read %d bytes instead of %d"
+                                % (len(buf), nbytes, ))
+            buf += tmp
+        assert len(buf) == nbytes, (buf, len(buf), nbytes)
+        return buf
 
     def _read_msg(self):
         """read message from server"""
@@ -453,7 +434,7 @@ class _Proxy(object):
         self.errmess = errmess
 
     def __str__(self):
-        return "ownet server at %s" % (self._sockaddr, )
+        return "owserver at %s" % (self._sockaddr, )
 
     def _init_errcodes(self):
         # fetch errcodes array from owserver
@@ -464,6 +445,12 @@ class _Proxy(object):
             # failed, leave the default empty errcodes
             pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
         """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
@@ -473,11 +460,11 @@ class _Proxy(object):
         assert not (flags & FLG_PERSISTENCE)
 
         try:
-            conn = _OwnetConnection(self._sockaddr, self._family, self.verbose)
-            ret, _, data = conn.req(msgtype, payload, flags, size, offset)
+            with _OwnetConnection(
+                    self._sockaddr, self._family, self.verbose) as conn:
+                ret, _, data = conn.req(msgtype, payload, flags, size, offset)
         except IOError as err:
             raise ConnError(*err.args)
-        conn.shutdown()
 
         return ret, data
 
@@ -569,6 +556,9 @@ class _PersistentProxy(_Proxy):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close_connection()
 
+    def __del__(self):
+        self.close_connection()
+
     def _open_connection(self):
         assert self.conn is None
         try:
@@ -622,7 +612,7 @@ class OwnetProxy(_Proxy):
 
     def __init__(self, host='localhost', port=4304, flags=0,
                  verbose=False, ):
-        """return an ownet proxy object bound at (host, port); default is
+        """return an owserver proxy object bound at (host, port); default is
         (localhost, 4304).
 
         'flags' are or-ed in the header of each query sent to owserver.
@@ -631,7 +621,8 @@ class OwnetProxy(_Proxy):
         """
 
         # this class will be deprecated in version 0.9.x
-        warnings.warn(PendingDeprecationWarning("Please use pyownet.proxy()"))
+        warnings.warn(DeprecationWarning(
+            "Please use {0}.proxy()".format(__name__)))
 
         # save init args
         self.flags = flags | FLG_OWNET
@@ -687,11 +678,6 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     host, port.
     """
 
-    if persistent:
-        pclass = _PersistentProxy
-    else:
-        pclass = _Proxy
-
     # resolve host name/port
     try:
         gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
@@ -702,12 +688,11 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     lasterr = None
     for (family, _, _, _, sockaddr) in gai:
         try:
-            owp = pclass(family, sockaddr, flags, verbose)
-            owp.ping()
+            owp = _PersistentProxy(family, sockaddr, flags, verbose)
+            owp.__enter__()
         except ConnError as err:
             # not working, go over to next sockaddr
             lasterr = err
-            # fixme: should release owp resources?
         else:
             # ok, this is working, stop searching
             break
@@ -716,8 +701,19 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
         assert isinstance(lasterr, ConnError)
         raise lasterr
 
-    # fixme: should this be only optional?
-    owp._init_errcodes()
+    with owp:
+        try:
+            # fixme: should this be only optional?
+            owp._init_errcodes()
+        except ConnError as err:
+            raise ProtocolError('Error while connecting to owserver: {}'
+                                .format(err))
+        except ProtocolError as err:
+            # pass ProtocolError unchanged
+            raise err
+
+    if not persistent:
+        owp = clone(owp, persistent=False)
 
     return owp
 

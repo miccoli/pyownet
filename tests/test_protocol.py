@@ -1,29 +1,16 @@
-import unittest
 import sys
-import os
+if sys.version_info < (2, 7, ):
+    import unittest2 as unittest
+else:
+    import unittest
+import warnings
+
 from pyownet import protocol
+from . import (HOST, PORT)
+
 
 def setUpModule():
-    if sys.version_info < (3, ):
-        from ConfigParser import ConfigParser
-    else:
-        from configparser import ConfigParser
-        import warnings
-
-        warnings.simplefilter('ignore', PendingDeprecationWarning)
-
-    config = ConfigParser()
-
-    config.add_section('server')
-    config.set('server', 'host', 'localhost')
-    config.set('server', 'port', '4304')
-
-    config.read([os.path.join(os.path.dirname(__file__), 'tests.ini')])
-
-    global HOST, PORT
-
-    HOST = config.get('server', 'host')
-    PORT = config.get('server', 'port')
+    "gloabal setup"
 
 
 class _TestProxyMix(object):
@@ -63,10 +50,12 @@ class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
     @classmethod
     def setUpClass(cls):
         try:
-            cls.proxy = protocol.OwnetProxy(HOST, PORT)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', DeprecationWarning)
+                cls.proxy = protocol.OwnetProxy(HOST, PORT)
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
@@ -76,8 +65,8 @@ class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
         try:
             cls.proxy = protocol.proxy(HOST, PORT, persistent=False)
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_PersistentProxy(_TestProxyMix, unittest.TestCase, ):
@@ -87,8 +76,8 @@ class Test_PersistentProxy(_TestProxyMix, unittest.TestCase, ):
         try:
             cls.proxy = protocol.proxy(HOST, PORT, persistent=True, )
         except protocol.ConnError as exc:
-            raise RuntimeError('no owserver on %s:%s, got:%s' %
-                               (HOST, PORT, exc))
+            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
+                                    (HOST, PORT, exc))
 
 
 class Test_clone_FT(Test_Proxy):
@@ -100,11 +89,13 @@ class Test_clone_FT(Test_Proxy):
     def tearDown(self):
         self.proxy.close_connection()
 
+
 class Test_clone_FF(Test_Proxy):
 
     def setUp(self):
         assert not isinstance(self.__class__.proxy, protocol._PersistentProxy)
         self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
+
 
 class Test_clone_TT(Test_PersistentProxy):
 
@@ -115,21 +106,30 @@ class Test_clone_TT(Test_PersistentProxy):
     def tearDown(self):
         self.proxy.close_connection()
 
+
 class Test_clone_TF(Test_PersistentProxy):
 
     def setUp(self):
         assert isinstance(self.__class__.proxy, protocol._PersistentProxy)
         self.proxy = protocol.clone(self.__class__.proxy, persistent=False)
 
+
 class Test_misc(unittest.TestCase):
 
     def test_exceptions(self):
-        self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', DeprecationWarning)
+            self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
+                              host='nonexistent.fake')
+        self.assertRaises(protocol.ConnError, protocol.proxy,
                           host='nonexistent.fake')
+        self.assertRaises(protocol.ConnError, protocol.proxy,
+                          host=HOST, port=-1)
+        self.assertRaises(protocol.ProtocolError, protocol.proxy,
+                          host='www.google.com', port=80)
+        self.assertRaises(TypeError, protocol.clone, 1)
         self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
         self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
-        self.assertRaises(protocol.ConnError, protocol.proxy, HOST, -1)
-        self.assertRaises(TypeError, protocol.clone, 1)
 
 if __name__ == '__main__':
     unittest.main()
