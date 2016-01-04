@@ -1,0 +1,5 @@
+Sphinx
+sphinx-rtd-theme
+# extension for spelling check
+sphinxcontrib-spelling
+pyenchant
