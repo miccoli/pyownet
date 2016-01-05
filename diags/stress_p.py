@@ -3,9 +3,13 @@ from __future__ import print_function
 import atexit
 import time
 import threading
+import sys
+if sys.version_info < (3, ):
+    from urlparse import (urlsplit, )
+else:
+    from urllib.parse import (urlsplit, )
 
 from pyownet import protocol
-from . import (HOST, PORT)
 
 MTHR = 10
 
@@ -17,7 +21,13 @@ def log(s):
 
 
 def main():
-    proxy = protocol.proxy(HOST, PORT, verbose=False)
+    assert len(sys.argv) == 2
+    urlc = urlsplit(sys.argv[1], scheme='owserver', allow_fragments=False)
+    host = urlc.hostname or 'localhost'
+    port = urlc.port or 4304
+    assert not urlc.path or urlc.path == '/'
+
+    proxy = protocol.proxy(host, port, verbose=False)
     pid = ver = ''
     try:
         pid = int(proxy.read('/system/process/pid'))

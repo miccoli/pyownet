@@ -1,41 +1,15 @@
-*.py[cod]
-MANIFEST
-
-# C extensions
-*.so
-
-# Packages
+# general things to ignore
+build/
+dist/
+*.egg-info/
 *.egg
-*.egg-info
-dist
-build
-eggs
-parts
-bin
-var
-sdist
-develop-eggs
-.installed.cfg
-lib
-lib64
-__pycache__
+*.py[cod]
+__pycache__/
 
-# Installer logs
-pip-log.txt
-
-# Unit test / coverage reports
-.coverage
+# tox
 .tox
-nosetests.xml
 
-# Translations
-*.mo
-
-# docs/sphinx
-/docs/_build/
-
-# emacs backup files
-*~
-
-# pyenv config
-.python-version
+# docutil generated
+/README.html
+/CHANGELOG.html
+/TODO.html

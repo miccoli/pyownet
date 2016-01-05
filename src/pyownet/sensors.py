@@ -27,7 +27,7 @@ import weakref
 from .protocol import bytes2str
 from . import protocol
 
-_STRUCT_DIR = '/structure/'
+_STRUCT_DIR = protocol.PTH_STRUCTURE
 
 # see http://owfs.org/index.php?page=structure-directory
 _TYPE_CODE = dict(i=int, u=int, f=float,

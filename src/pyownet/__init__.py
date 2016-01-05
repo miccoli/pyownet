@@ -17,8 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['__version__', ]
-__version__ = '0.9.0.dev6'
+__all__ = ['__version__', 'Error']
+__version__ = '0.10.0dev6'
 
 
 class Error(Exception):
