@@ -1,8 +1,8 @@
 Changelog
 =========
 
-v0.9.0 (release candidate)
---------------------------
+v0.9.0 (2016-01-04)
+-------------------
 
 No major new features, API cleanup to ensure that connections are
 properly closed. Functions that return binary data return ``bytes``.

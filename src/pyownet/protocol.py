@@ -601,14 +601,13 @@ class _PersistentProxy(_Proxy):
 
 
 #
-# legacy classes, please use factory functions instead
+# class OwnetProxy is deprecated and for legacy support only,
+# please use factory functions below instead
 #
 
 class OwnetProxy(_Proxy):
-    """This class is for legacy support only, and will be deprecated.
+    """This class is for legacy support only, and is deprecated."""
 
-    Objects of this class define methods to query a given owserver
-    """
 
     def __init__(self, host='localhost', port=4304, flags=0,
                  verbose=False, ):
@@ -620,7 +619,7 @@ class OwnetProxy(_Proxy):
         printed on stdout.
         """
 
-        # this class will be deprecated in version 0.9.x
+        # this class is deprecated since version 0.9.0
         warnings.warn(DeprecationWarning(
             "Please use {0}.proxy()".format(__name__)))
 
