@@ -1,6 +1,11 @@
 Changelog
 =========
 
+v0.9.1 (devel)
+--------------
+
+- deprecated classes moved to ``pyownet.legacy`` module
+
 v0.9.0 (2016-01-04)
 -------------------
 
