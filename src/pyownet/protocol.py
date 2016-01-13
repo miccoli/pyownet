@@ -157,7 +157,8 @@ class Error(_Error):
 
 
 class ConnError(Error, IOError):
-    """Raised if no valid connection can be established with owserver."""
+    """Raised when a socket call returns an error."""
+    # FIXME: since python 3.3 IOError is an alias for OSError
 
 
 class ProtocolError(Error):
@@ -186,6 +187,7 @@ class ShortWrite(ProtocolError):
 
 class OwnetError(Error, EnvironmentError):
     """Raised when owserver returns error code"""
+    # FIXME: since python 3.3 EnvironmentError is an alias for OSError
 
 
 #
@@ -314,10 +316,16 @@ class _OwnetConnection(object):
         self.socket.settimeout(_SCK_TIMEOUT)
         # FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
-        self.socket.connect(sockaddr)
+        try:
+            self.socket.connect(sockaddr)
+        except IOError as err:
+            raise ConnError(*err.args)
 
         if self.verbose:
             print(self.socket.getsockname(), '->', self.socket.getpeername())
+
+    def __del__(self):
+        self.socket.close()
 
     def __enter__(self):
         return self
@@ -340,7 +348,9 @@ class _OwnetConnection(object):
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
             pass
-        self.socket.close()
+        # FIXME: should explicitly close socket here, or is it sufficient
+        # to close upon garbage collection? (see __del__ above)
+        # self.socket.close()
 
     def req(self, msgtype, payload, flags, size=0, offset=0):
         """send message to server and return response"""
@@ -365,7 +375,10 @@ class _OwnetConnection(object):
             print('->', repr(header))
             print('..', repr(payload))
         assert header.payload == len(payload)
-        sent = self.socket.send(header + payload)
+        try:
+            sent = self.socket.send(header + payload)
+        except IOError as err:
+            raise ConnError(*err.args)
         if sent < len(header + payload):
             raise ShortWrite()
         assert sent == len(header + payload), sent
@@ -380,9 +393,15 @@ class _OwnetConnection(object):
     def _read_socket(self, nbytes):
         """read nbytes bytes from self.socket"""
 
-        buf = self.socket.recv(nbytes)
+        try:
+            buf = self.socket.recv(nbytes)
+        except IOError as err:
+            raise ConnError(*err.args)
         while len(buf) < nbytes:
-            tmp = self.socket.recv(nbytes - len(buf))
+            try:
+                tmp = self.socket.recv(nbytes - len(buf))
+            except IOError as err:
+                raise ConnError(*err.args)
             if len(tmp) == 0:
                 if self.verbose and buf:
                     print('ee', repr(buf))
@@ -463,12 +482,9 @@ class _Proxy(object):
         flags |= self.flags
         assert not (flags & FLG_PERSISTENCE)
 
-        try:
-            with _OwnetConnection(
-                    self._sockaddr, self._family, self.verbose) as conn:
-                ret, _, data = conn.req(msgtype, payload, flags, size, offset)
-        except IOError as err:
-            raise ConnError(*err.args)
+        with _OwnetConnection(
+                self._sockaddr, self._family, self.verbose) as conn:
+            ret, _, data = conn.req(msgtype, payload, flags, size, offset)
 
         return ret, data
 
@@ -565,12 +581,9 @@ class _PersistentProxy(_Proxy):
 
     def _open_connection(self):
         assert self.conn is None
-        try:
-            self.conn = _OwnetConnection(self._sockaddr,
-                                         self._family,
-                                         self.verbose)
-        except IOError as err:
-            raise ConnError(*err.args)
+        self.conn = _OwnetConnection(self._sockaddr,
+                                     self._family,
+                                     self.verbose)
 
     def close_connection(self):
         if self.conn:
@@ -592,11 +605,8 @@ class _PersistentProxy(_Proxy):
 
         flags |= self.flags
         assert (flags & FLG_PERSISTENCE)
-        try:
-            ret, rflags, data = self.conn.req(
-                msgtype, payload, flags, size, offset)
-        except IOError as err:
-            raise ConnError(*err.args)
+        ret, rflags, data = self.conn.req(
+            msgtype, payload, flags, size, offset)
         # persistence not granted
         if not (rflags & FLG_PERSISTENCE):
             self.close_connection()
@@ -623,30 +633,27 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     # gai is a list of tuples, search for the first working one
     lasterr = None
     for (family, _, _, _, sockaddr) in gai:
+        owp = _PersistentProxy(family, sockaddr, flags, verbose)
         try:
-            owp = _PersistentProxy(family, sockaddr, flags, verbose)
-            owp.__enter__()
+            owp._open_connection()
         except ConnError as err:
-            # not working, go over to next sockaddr
+            # no connection, go over to next sockaddr
             lasterr = err
         else:
-            # ok, this is working, stop searching
+            # ok, open socket connection, stop searching
             break
     else:
-        # no working (sockaddr, family) found: reraise last exception
+        # no server listening on (family, sockaddr) found:
+        # reraise last exception
         assert isinstance(lasterr, ConnError)
         raise lasterr
 
     with owp:
-        try:
-            # fixme: should this be only optional?
-            owp._init_errcodes()
-        except ConnError as err:
-            raise ProtocolError('Error while connecting to owserver: {}'
-                                .format(err))
-        except ProtocolError as err:
-            # pass ProtocolError unchanged
-            raise err
+        # check of server found listening is an owserver
+        owp.ping()
+        # init errno to errmessage mapping
+        # fixme: should this  be only optional?
+        owp._init_errcodes()
 
     if not persistent:
         owp = clone(owp, persistent=False)

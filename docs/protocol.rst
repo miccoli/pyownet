@@ -335,7 +335,7 @@ functions.
    before the first call to a method, which could be useful for error
    handling.
 
-   For non-persistent connection entering and exiting the ``with``
+   For non-persistent connections, entering and exiting the ``with``
    block context is a no-op.
 
 
@@ -366,7 +366,8 @@ Concrete exceptions
 .. py:exception:: ConnError
 
    This exception is raised when a network connection to the owserver
-   cannot be established. In fact it wraps the causing `OSError`_
+   cannot be established, or a system function error occurs during
+   socket operations. In fact it wraps the causing `OSError`_
    exception along with all its arguments, from which it inherits.
 
 .. py:exception:: ProtocolError

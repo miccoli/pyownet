@@ -4,6 +4,8 @@ Changelog
 v0.9.1 (devel)
 --------------
 
+- wrap calls to socket methods in ``_OwnetConnection`` and raise
+  ``ConnError`` in case of ``OSerror``'s (close #5)
 - deprecated classes moved to ``pyownet.legacy`` module
 
 v0.9.0 (2016-01-04)
