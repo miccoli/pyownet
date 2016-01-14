@@ -47,6 +47,8 @@ import socket
 
 from . import Error as _Error
 
+import time
+
 #
 # owserver protocol related constants
 #
@@ -163,6 +165,10 @@ class ConnError(Error, IOError):
 
 class ProtocolError(Error):
     """Raised if no valid server response received."""
+
+
+class ComTimeoutError(Error):
+    """Raised if response of server takes longer than a given timeout."""
 
 
 class MalformedHeader(ProtocolError):
@@ -352,21 +358,38 @@ class _OwnetConnection(object):
         # to close upon garbage collection? (see __del__ above)
         # self.socket.close()
 
-    def req(self, msgtype, payload, flags, size=0, offset=0):
+    def req(self, msgtype, payload, flags, size=0, offset=0, timeout=0):
         """send message to server and return response"""
+
+        if timeout < 0:
+            raise ValueError("timeout cannot be negative!")
 
         tohead = _ToServerHeader(payload=len(payload), type=msgtype,
                                  flags=flags, size=size, offset=offset)
+
+        tstartcom = time.time()  # set timer when communication begins
         self._send_msg(tohead, payload)
+
         while True:
             fromhead, data = self._read_msg()
 
-            if fromhead.payload < 0 and msgtype != MSG_NOP:
-                # Server said PING to keep connection alive during
-                # lenghty op
-                continue
+            if fromhead.payload >= 0:
+                # we received a valid answer and return the result
+                return fromhead.ret, fromhead.flags, data
 
-            return fromhead.ret, fromhead.flags, data
+            assert msgtype != MSG_NOP
+
+            # we did not exit the loop because payload is negative
+            # Server said PING to keep connection alive during lenghty op
+
+            # check if timeout has expired
+            if timeout:
+                tcom = time.time() - tstartcom
+                if tcom > timeout:
+                    raise ComTimeoutError(
+                        "Communication with owserver aborted"
+                        "after %2.1fs, timeout of %2.1fs exceeded" %
+                        (tcom, timeout))
 
     def _send_msg(self, header, payload):
         """send message to server"""
@@ -474,7 +497,7 @@ class _Proxy(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0, timeout=0):
         """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
         """
@@ -484,7 +507,8 @@ class _Proxy(object):
 
         with _OwnetConnection(
                 self._sockaddr, self._family, self.verbose) as conn:
-            ret, _, data = conn.req(msgtype, payload, flags, size, offset)
+            ret, _, data = conn.req(
+                msgtype, payload, flags, size, offset, timeout)
 
         return ret, data
 
@@ -495,17 +519,18 @@ class _Proxy(object):
         if (ret, data) != (0, bytes()):
             raise OwnetError(-ret, self.errmess[-ret])
 
-    def present(self, path):
+    def present(self, path, timeout=0):
         """returns True if there is an entity at path"""
 
-        ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
+        ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path),
+                                  timeout=timeout)
         assert ret <= 0 and len(data) == 0
         if ret < 0:
             return False
         else:
             return True
 
-    def dir(self, path='/', slash=True, bus=False):
+    def dir(self, path='/', slash=True, bus=False, timeout=0):
         """list entities at path"""
 
         if slash:
@@ -517,7 +542,7 @@ class _Proxy(object):
         else:
             flags = self.flags & ~FLG_BUS_RET
 
-        ret, data = self.sendmess(msg, str2bytez(path), flags)
+        ret, data = self.sendmess(msg, str2bytez(path), flags, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         if data:
@@ -525,19 +550,19 @@ class _Proxy(object):
         else:
             return []
 
-    def read(self, path, size=MAX_PAYLOAD, offset=0):
+    def read(self, path, size=MAX_PAYLOAD, offset=0, timeout=0):
         """read data at path"""
 
         if size > MAX_PAYLOAD:
             raise ValueError("size cannot exceed %d" % MAX_PAYLOAD)
 
         ret, data = self.sendmess(MSG_READ, str2bytez(path),
-                                  size=size, offset=offset, )
+                                  size=size, offset=offset, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         return data
 
-    def write(self, path, data, offset=0):
+    def write(self, path, data, offset=0, timeout=0):
         """write data at path
 
         path is a string, data binary; it is responsability of the caller
@@ -549,7 +574,8 @@ class _Proxy(object):
             raise TypeError("'data' argument must be binary")
 
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
-                                   size=len(data), offset=offset)
+                                   size=len(data), offset=offset,
+                                   timeout=timeout)
         assert len(rdata) == 0
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
@@ -592,7 +618,7 @@ class _PersistentProxy(_Proxy):
         else:
             assert self.conn is None
 
-    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0, timeout=0):
         """
         retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
@@ -606,7 +632,7 @@ class _PersistentProxy(_Proxy):
         flags |= self.flags
         assert (flags & FLG_PERSISTENCE)
         ret, rflags, data = self.conn.req(
-            msgtype, payload, flags, size, offset)
+            msgtype, payload, flags, size, offset, timeout)
         # persistence not granted
         if not (rflags & FLG_PERSISTENCE):
             self.close_connection()
