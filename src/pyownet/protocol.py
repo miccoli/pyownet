@@ -44,10 +44,13 @@ from __future__ import print_function
 
 import struct
 import socket
+try:
+    from time import monotonic
+except ImportError:
+    # pretend that time.time is monotonic
+    from time import time as monotonic
 
 from . import Error as _Error
-
-import time
 
 #
 # owserver protocol related constants
@@ -167,10 +170,6 @@ class ProtocolError(Error):
     """Raised if no valid server response received."""
 
 
-class ComTimeoutError(Error):
-    """Raised if response of server takes longer than a given timeout."""
-
-
 class MalformedHeader(ProtocolError):
     """Raised for header parsing errors."""
 
@@ -194,6 +193,18 @@ class ShortWrite(ProtocolError):
 class OwnetError(Error, EnvironmentError):
     """Raised when owserver returns error code"""
     # FIXME: since python 3.3 EnvironmentError is an alias for OSError
+
+
+class OwnetTimeout(Error):
+    """Raised if response of server takes longer than a given timeout."""
+
+    def __init__(self, elapsed, timeout):
+        self.elapsed = elapsed
+        self.timeout = timeout
+
+    def __str__(self):
+        return ("Communication with owserver aborted after {0.elapsed:.1f}s, "
+                "timeout of {0.timeout:.1f}s exceeded".format(self))
 
 
 #
@@ -367,7 +378,7 @@ class _OwnetConnection(object):
         tohead = _ToServerHeader(payload=len(payload), type=msgtype,
                                  flags=flags, size=size, offset=offset)
 
-        tstartcom = time.time()  # set timer when communication begins
+        tstartcom = monotonic()  # set timer when communication begins
         self._send_msg(tohead, payload)
 
         while True:
@@ -384,12 +395,9 @@ class _OwnetConnection(object):
 
             # check if timeout has expired
             if timeout:
-                tcom = time.time() - tstartcom
+                tcom = monotonic() - tstartcom
                 if tcom > timeout:
-                    raise ComTimeoutError(
-                        "Communication with owserver aborted"
-                        "after %2.1fs, timeout of %2.1fs exceeded" %
-                        (tcom, timeout))
+                    raise OwnetTimeout(tcom, timeout)
 
     def _send_msg(self, header, payload):
         """send message to server"""
