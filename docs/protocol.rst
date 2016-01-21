@@ -27,11 +27,11 @@ owserver protocol messages.
 
 .. _persistence:
 
-Persistent vs. non persistent proxy objects.
+Persistent vs. non-persistent proxy objects.
 --------------------------------------------
 
-The owserver protocol presents two variants: *non persistent*
-connection and *persistent* connection. In a *non persistent*
+The owserver protocol presents two variants: *non-persistent*
+connection and *persistent* connection. In a *non-persistent*
 connection a network socket is bound and torn down for each
 client-server message exchange; the protocol is stateless. For a
 *persistent* connection the same socket is reused for subsequent
@@ -39,32 +39,73 @@ client-server interactions and the socket has to be torn down only
 at the end of the session.  Note that there is no guarantee that a
 persistent connection is granted by the server: if the server is not
 willing to grant a persistent connection, the protocol requires a
-fall-back towards a non persistent connection.
+fall-back towards a non-persistent connection.
 
 Correspondingly two different proxy object classes are implemented:
 *non-persistent* and *persistent*.
 
-* *Non-persistent* proxy objects are thread-safe, in the sense that
-  different threads can use the same proxy object for concurrent
-  access to the same owserver. At each method call of this class, a
-  new socket is bound and torn down before the method return.
+* *Non-persistent* proxy objects are thread-safe: at each method call
+  of this class, a new socket is bound and torn down after a reply is
+  received. Even if multiple threads use concurrently the same pyownet
+  proxy object, there is no risk of garbling the order of the
+  responses.
 
-* *Persistent* proxy objects are not thread safe, in the sense that
-  the same object cannot be used concurrently by different threads. If
-  multithreaded use is desired, it is responsibility of the user to
-  implement a proper locking mechanism.  On the first call to a
-  method, a socket is bound to the owserver and kept open for reuse in
-  the subsequent calls. It is responsibility of the user to explicitly
-  close the connection at the end of a session.
+* *Persistent* proxy objects are not thread safe: on the first call to
+  a method, a socket is bound to the owserver and kept open for reuse
+  in subsequent calls; it is responsibility of the user to explicitly
+  close the connection at the end of a session. This mode is not
+  thread safe because if multiple threads use the same socket to send
+  messages to an owserver, there is no guarantee that they will
+  receive the respective answer due to a race condition on the single
+  socket stream. If a single persistent proxy object has to be used by
+  multiple threads, a locking mechanism has to be implemented, to
+  prevent concurrent use of the persistent socket.
 
 In general, if performance is not an issue, it is safer to use
 non-persistent connection proxies: the protocol is simpler to manage,
 and usually the cost of creating a socket for each message is
 negligible with respect to the 1-wire network response times.
 
+.. _timeouts:
 
-Functions
----------
+Timeouts
+--------
+
+owserver operations are `synchronous`: on a given socket connection,
+the server waits for an incoming client message, replies to the
+message, and closes the connection (when in non-persistent mode) or
+starts over (when in persistent mode.)  Since 1-wire replies can take
+a long time to be generated, after receiving a request, the server
+sends keepalive frames at 1 second intervals to signal the client that
+the connection is still alive and that a response is in preparation.
+
+All methods of a pyownet proxy object are blocking: method calls return
+only after a server response is received. To avoid dead-locks, two
+different timeout mechanisms are implemented:
+
+- a low level timeout on socket operations,
+- a high level timeout valid for owsever messages.
+
+The low level timeout is applied to all socket operations: when the
+timeout is expired [#socktimeout]_ a :py:exc:`ConnError` is
+raised. This typically happens if there are network problems or the
+owserver crashes.
+
+The high level timeout is optional, and is specified as a keyword
+argument to the proxy object methods. If ``timeout==0`` the operation
+blocks as long as the owserver sends keepalive packets. For
+``timeout>0``, after ``timeout`` seconds a :py:exc:`OwnetTimeout`
+exception is raised. Please note that the check for an expired timeout
+is performed only after a keepalive packet is received from the
+server, therefore once every second.
+
+.. rubric:: Footnotes
+
+.. [#socktimeout] The socket timeout interval is set by the internal
+		  constant ``_SCK_TIMEOUT``, by default 2 seconds.
+
+Factory functions
+-----------------
 
 .. py:function:: proxy(host='localhost', port=4304, flags=0, \
                        persistent=False, verbose=False, )
@@ -138,14 +179,14 @@ Proxy objects
 Proxy objects are returned by the factory functions :func:`proxy` and
 :func:`clone`: methods of the proxy object send messages to the
 proxied server and return it's response, if any. They exists in two
-versions: non persistent :class:`_Proxy` instances and persistent
+versions: non-persistent :class:`_Proxy` instances and persistent
 :class:`_PersistentProxy` instances. The corresponding classes should
 not be instantiated directly by the user, but only by the factory
 functions.
 
 .. py:class:: _Proxy
 
-   Objects of this class follow the non persistent protocol: a new
+   Objects of this class follow the non-persistent protocol: a new
    socket is created and connected to the owserver for each method
    invocation; after the server reply message is received, the socket
    is shut down. The implementation is thread-safe: different threads
@@ -162,16 +203,17 @@ functions.
        be used for verifying that a given server is accepting
        connections and alive.
 
-   .. py:method:: present(path)
+   .. py:method:: present(path, timeout=0)
 
       Check if a node is present at path.
 
       :param str path: OWFS path
+      :param float timeout: operation timeout (seconds)
       :return: ``True`` if an entity is present at path, ``False`` otherwise
       :rtype: bool
 
 
-   .. py:method:: dir(path='/', slash=True, bus=False)
+   .. py:method:: dir(path='/', slash=True, bus=False, timeout=0)
 
       List directory content
 
@@ -179,6 +221,7 @@ functions.
       :param bool slash: ``True`` if directories should be marked with a
                          trailing slash
       :param bool bus: ``True`` if special directories should be listed
+      :param float timeout: operation timeout (seconds)
       :return: directory content
       :rtype: list
 
@@ -196,13 +239,14 @@ functions.
       trailing slash. If ``bus=True`` also special directories (like
       ``'/settings'``, ``'/structure'``, ``'/uncached'``) are listed.
 
-   .. py:method:: read(path, size=MAX_PAYLOAD, offset=0)
+   .. py:method:: read(path, size=MAX_PAYLOAD, offset=0, timeout=0)
 
       Read node at path
 
       :param str path: OWFS path
       :param int size: maximum length of data read
       :param int offset: offset at which read data
+      :param float timeout: operation timeout (seconds)
       :return: binary buffer
       :rtype: bytes
 
@@ -221,13 +265,14 @@ functions.
       if ``data = read(path)``, then ``read(path, size, offset)``
       returns ``data[offset:offset+size]``.)
 
-   .. py:method:: write(path, data, offset=0)
+   .. py:method:: write(path, data, offset=0, timeout=0)
 
       Write data at path.
 
       :param str path: OWFS path
       :param bytes data: binary data to write
       :param int offset: offset at which write data
+      :param float timeout: operation timeout (seconds)
       :return: ``None``
 
       Writes binary ``data`` to node at ``path``; when ``offset > 0`` data
@@ -238,7 +283,7 @@ functions.
         >>> owproxy = protocol.proxy()
         >>> owproxy.write('/10.000010EF0000/alias', b'myalias')
 
-   .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0)
+   .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0, timeout=0)
 
       Send message to owserver.
 
@@ -247,6 +292,7 @@ functions.
       :param int flags: message flags
       :param size int: message size
       :param offset int: message offset
+      :param float timeout: operation timeout (seconds)
       :return: owserver return code and reply data
       :rtype: ``(int, bytes)`` tuple
 
@@ -283,7 +329,7 @@ functions.
    flag set; if the server grants persistence, the socket is kept
    open, otherwise the socket is shut down as for :class:`_Proxy`
    instances. In other terms if persistence is not granted there is an
-   automatic fallback to the non persistent protocol.
+   automatic fallback to the non-persistent protocol.
 
    The use of the persistent protocol is therefore transparent to the
    user, with an important difference: if persistence is granted by
@@ -363,12 +409,29 @@ Concrete exceptions
 
 .. _OSError: https://docs.python.org/3/library/exceptions.html#OSError
 
+.. py:exception:: OwnetTimeout
+
+   This exception is raised when there is an owserver operation in
+   progress but a given timeout period has expired. This is distinct
+   from a low-level socket timeout which is signalled by a
+   :py:exc:`ConnError`). See :ref:`timeouts`.
+
 .. py:exception:: ConnError
 
-   This exception is raised when a network connection to the owserver
-   cannot be established, or a system function error occurs during
-   socket operations. In fact it wraps the causing `OSError`_
-   exception along with all its arguments, from which it inherits.
+   This exception is raised when
+
+   - a network connection to the owserver cannot be established,
+   - a system function error occurs during socket operations, or
+   - a socket timeout occurs at the OS level.
+
+   In fact ``ConnError`` simply wraps the causing `OSError`_ exception
+   along with all its arguments, from which it inherits. In other
+   terms it is typically implemented as ::
+
+     try:
+         # do some socket exception
+     except OSError as exc:
+         raise ConnError(*exc.args)
 
 .. py:exception:: ProtocolError
 
@@ -404,6 +467,7 @@ The exception class hierarchy for this module is:
    pyownet.Error
     +-- pyownet.protocol.Error
          +-- pyownet.protocol.OwnetError
+         +-- pyownet.protocol.OwnetTimeout
          +-- pyownet.protocol.ConnError
          +-- pyownet.protocol.ProtocolError
               +-- pyownet.protocol.MalformedHeader
