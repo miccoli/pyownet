@@ -131,5 +131,12 @@ class Test_misc(unittest.TestCase):
         self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
         self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
 
+    def test_str(self):
+        # check edge conditions in which _OwnetConnection.__str__ could fail
+        p = protocol.proxy(HOST, PORT, persistent=True)
+        p.ping()
+        p.conn.shutdown()
+        str(p.conn)  # could fail if not able to determine socket peername
+
 if __name__ == '__main__':
     unittest.main()

@@ -178,11 +178,25 @@ class MalformedHeader(ProtocolError):
 
 
 class ShortRead(ProtocolError):
-    """Raised if not enough date received."""
+    """Raised if not enough data received."""
+
+    def __init__(self, read, expected):
+        self.read = read
+        self.expected = expected
+
+    def __str__(self):
+        return "received {0.read} bytes instead of {0.expected}.".format(self)
 
 
 class ShortWrite(ProtocolError):
     """Raised if unable to write all data."""
+
+    def __init__(self, sent, tosend):
+        self.sent = sent
+        self.tosend = tosend
+
+    def __str__(self):
+        return "sent {0.sent} bytes instead of {0.tosend}.".format(self)
 
 
 class OwnetError(Error, EnvironmentError):
@@ -312,7 +326,9 @@ class _OwnetConnection(object):
 
         self.verbose = verbose
 
-        self.socket = socket.socket(family, socket.SOCK_STREAM)
+        self.socket = socket.socket(family=family,
+                                    type=socket.SOCK_STREAM,
+                                    proto=socket.IPPROTO_TCP)
         self.socket.settimeout(_SCK_TIMEOUT)
         # FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
@@ -321,8 +337,10 @@ class _OwnetConnection(object):
         except IOError as err:
             raise ConnError(*err.args)
 
+        assert self.socket.getpeername() == sockaddr
+        self.peername = sockaddr
         if self.verbose:
-            print(self.socket.getsockname(), '->', self.socket.getpeername())
+            print(self.socket.getsockname(), '->', self.peername)
 
     def __del__(self):
         self.socket.close()
@@ -335,18 +353,20 @@ class _OwnetConnection(object):
 
     def __str__(self):
         return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
-                                                    self.socket.getpeername())
+                                                    self.peername)
 
     def shutdown(self):
         """shutdown connection"""
 
         if self.verbose:
-            print(self.socket.getsockname(), 'xx', self.socket.getpeername())
+            print(self.socket.getsockname(), 'xx', self.peername)
 
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
+            # remote peer has already closed the connection,
+            # just ignore the exceeption
             pass
         # FIXME: should explicitly close socket here, or is it sufficient
         # to close upon garbage collection? (see __del__ above)
@@ -379,43 +399,59 @@ class _OwnetConnection(object):
             sent = self.socket.send(header + payload)
         except IOError as err:
             raise ConnError(*err.args)
+
+        # FIXME FIXME FIXME:
+        # investigate under which situations socket.send should be retried
+        # instead of aborted.
+        # FIXME FIXME FIXME
         if sent < len(header + payload):
-            raise ShortWrite()
+            raise ShortWrite(sent, len(header+payload))
         assert sent == len(header + payload), sent
-
-    #
-    # NOTE:
-    # '_read_socket(self, nbytes)' was implemented as
-    # 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
-    # but socket.MSG_WAITALL proved not reliable
-    #
-
-    def _read_socket(self, nbytes):
-        """read nbytes bytes from self.socket"""
-
-        try:
-            buf = self.socket.recv(nbytes)
-        except IOError as err:
-            raise ConnError(*err.args)
-        while len(buf) < nbytes:
-            try:
-                tmp = self.socket.recv(nbytes - len(buf))
-            except IOError as err:
-                raise ConnError(*err.args)
-            if len(tmp) == 0:
-                if self.verbose and buf:
-                    print('ee', repr(buf))
-                raise ShortRead("short read: read %d bytes instead of %d"
-                                % (len(buf), nbytes, ))
-            buf += tmp
-        assert len(buf) == nbytes, (buf, len(buf), nbytes)
-        return buf
 
     def _read_msg(self):
         """read message from server"""
 
-        header = _FromServerHeader(self._read_socket(_FromServerHeader
-                                                     .header_size))
+        #
+        # NOTE:
+        # '_recv_socket(nbytes)' was implemented as
+        # 'socket.recv(nbytes, socket.MSG_WAITALL)'
+        # but socket.MSG_WAITALL proved not reliable
+        #
+
+        def _recv_socket(nbytes):
+            """read nbytes bytes from self.socket"""
+
+            #
+            # code below is written under the assumption that
+            # 'nbytes' is smallish so that the 'while len(buf) < nbytes' loop
+            # is entered rarerly
+            #
+            try:
+                buf = self.socket.recv(nbytes)
+            except IOError as err:
+                raise ConnError(*err.args)
+
+            if not buf:
+                raise ShortRead(0, nbytes)
+
+            while len(buf) < nbytes:
+                try:
+                    tmp = self.socket.recv(nbytes - len(buf))
+                except IOError as err:
+                    raise ConnError(*err.args)
+
+                if not tmp:
+                    if self.verbose:
+                        print('ee', repr(buf))
+                    raise ShortRead(len(buf), nbytes)
+
+                buf += tmp
+
+            assert len(buf) == nbytes, (buf, len(buf), nbytes)
+            return buf
+
+        data = _recv_socket(_FromServerHeader.header_size)
+        header = _FromServerHeader(data)
         if self.verbose:
             print('<-', repr(header))
 
@@ -426,7 +462,7 @@ class _OwnetConnection(object):
             raise MalformedHeader('huge payload, unwilling to read', header)
 
         if header.payload > 0:
-            payload = self._read_socket(header.payload)
+            payload = _recv_socket(header.payload)
             if self.verbose:
                 print('..', repr(payload))
             assert header.size <= header.payload
@@ -492,14 +528,15 @@ class _Proxy(object):
         """sends a NOP packet and waits response; returns None"""
 
         ret, data = self.sendmess(MSG_NOP, bytes())
-        if (ret, data) != (0, bytes()):
+        assert ret <= 0 and not data, (ret, data)
+        if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret])
 
     def present(self, path):
         """returns True if there is an entity at path"""
 
         ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
-        assert ret <= 0 and len(data) == 0
+        assert ret <= 0 and not data, (ret, data)
         if ret < 0:
             return False
         else:
@@ -550,7 +587,7 @@ class _Proxy(object):
 
         ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
                                    size=len(data), offset=offset)
-        assert len(rdata) == 0
+        assert not rdata, (ret, rdata)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
 
@@ -626,13 +663,15 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
 
     # resolve host name/port
     try:
-        gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM,
+                                 socket.IPPROTO_TCP)
     except socket.gaierror as err:
         raise ConnError(*err.args)
 
     # gai is a list of tuples, search for the first working one
     lasterr = None
-    for (family, _, _, _, sockaddr) in gai:
+    for (family, _type, _proto, _, sockaddr) in gai:
+        assert _type is socket.SOCK_STREAM and _proto is socket.IPPROTO_TCP
         owp = _PersistentProxy(family, sockaddr, flags, verbose)
         try:
             owp._open_connection()
