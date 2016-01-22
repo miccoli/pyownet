@@ -14,3 +14,4 @@ pathnames
 hardcoded
 designator
 builtin
+keepalive
