@@ -4,6 +4,8 @@ Changelog
 v0.9.1 (devel)
 --------------
 
+- modify ``_OwnetConnection`` to ensure that a persistent connection is
+  closed on errors (relevant for timeouts and other connection errors)
 - implemented explicit timeout on ownet protocol methods;
   raises ``OwnetTimeout``
 - ``socket`` code reviewed and refactored

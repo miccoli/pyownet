@@ -342,6 +342,7 @@ class _OwnetConnection(object):
         """establish a connection with server at sockaddr"""
 
         self.verbose = verbose
+        self.peername = None
 
         self.socket = socket.socket(family=family,
                                     type=socket.SOCK_STREAM,
@@ -349,6 +350,7 @@ class _OwnetConnection(object):
         self.socket.settimeout(_SCK_TIMEOUT)
         # FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
+
         try:
             self.socket.connect(sockaddr)
         except IOError as err:
@@ -356,10 +358,15 @@ class _OwnetConnection(object):
 
         assert self.socket.getpeername() == sockaddr
         self.peername = sockaddr
+
         if self.verbose:
             print(self.socket.getsockname(), '->', self.peername)
 
     def __del__(self):
+
+        if self.verbose:
+            print(self.socket.getsockname(), 'XX', self.peername)
+
         self.socket.close()
 
     def __enter__(self):
@@ -640,8 +647,6 @@ class _PersistentProxy(_Proxy):
         self.flags |= FLG_PERSISTENCE
 
     def __enter__(self):
-        if not self.conn:
-            self._open_connection()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -649,12 +654,6 @@ class _PersistentProxy(_Proxy):
 
     def __del__(self):
         self.close_connection()
-
-    def _open_connection(self):
-        assert self.conn is None
-        self.conn = _OwnetConnection(self._sockaddr,
-                                     self._family,
-                                     self.verbose)
 
     def close_connection(self):
         if self.conn:
@@ -669,18 +668,24 @@ class _PersistentProxy(_Proxy):
         send generic message and returns retcode, data
         """
 
-        # ensure that there is an open connection
-        if not self.conn:
-            self._open_connection()
-        assert self.conn is not None
+        # reuse last valid connection or create new
+        conn = self.conn or _OwnetConnection(self._sockaddr,
+                                             self._family,
+                                             self.verbose)
+
+        # invalidate last connection
+        self.conn = None
 
         flags |= self.flags
         assert (flags & FLG_PERSISTENCE)
-        ret, rflags, data = self.conn.req(
+        ret, rflags, data = conn.req(
             msgtype, payload, flags, size, offset, timeout)
-        # persistence not granted
-        if not (rflags & FLG_PERSISTENCE):
-            self.close_connection()
+        if rflags & FLG_PERSISTENCE:
+            # persistence granted, save connection object for reuse
+            self.conn = conn
+        else:
+            # discard connection object
+            conn.shutdown()
 
         return ret, data
 
@@ -708,25 +713,31 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
         assert _type is socket.SOCK_STREAM and _proto is socket.IPPROTO_TCP
         owp = _PersistentProxy(family, sockaddr, flags, verbose)
         try:
-            owp._open_connection()
+            # check if there is an owserver listening
+            owp.ping()
         except ConnError as err:
             # no connection, go over to next sockaddr
             lasterr = err
         else:
-            # ok, open socket connection, stop searching
+            # ok, live owserver found, stop searching
             break
     else:
         # no server listening on (family, sockaddr) found:
-        # reraise last exception
+        # reraise last ConnError
         assert isinstance(lasterr, ConnError)
         raise lasterr
 
+    # here 'owp' points to a live owserver.
+    # if persistence is granted, there could be an open connection
+    # at 'owp.conn'
+
     with owp:
-        # check of server found listening is an owserver
-        owp.ping()
         # init errno to errmessage mapping
-        # fixme: should this  be only optional?
+        # FIXME: should this  be only optional?
         owp._init_errcodes()
+
+    # at exit of the 'with' context above the connection is closed
+    assert owp.conn is None
 
     if not persistent:
         owp = clone(owp, persistent=False)

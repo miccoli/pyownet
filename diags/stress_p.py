@@ -1,7 +1,22 @@
+"""this diagnostic program stresses persistent connections.
+
+At 60 s. intervals a new thread is started that holds an open persistent
+connection to the owserver.
+
+Each persistent connection is queried at increasing intervals of time.
+"""
+
 from __future__ import print_function
 
+from pyownet import protocol
+
 import atexit
-import time
+try:
+    from time import monotonic
+except ImportError:
+    # pretend that time.time is monotonic
+    from time import time as monotonic
+from time import strftime, sleep
 import threading
 import sys
 if sys.version_info < (3, ):
@@ -9,15 +24,9 @@ if sys.version_info < (3, ):
 else:
     from urllib.parse import (urlsplit, )
 
-from pyownet import protocol
-
-MTHR = 10
-
-tst = lambda: time.strftime('%T')
-
 
 def log(s):
-    print(tst(), s)
+    print(strftime('%T'), s)
 
 
 def main():
@@ -28,7 +37,8 @@ def main():
     assert not urlc.path or urlc.path == '/'
 
     proxy = protocol.proxy(host, port, verbose=False)
-    pid = ver = ''
+    pid = -1
+    ver = ''
     try:
         pid = int(proxy.read('/system/process/pid'))
         ver = proxy.read('/system/configuration/version').decode()
@@ -36,31 +46,52 @@ def main():
         pass
     log("{0}, pid={1:d}, {2}".format(proxy, pid, ver))
 
-    delta = 1
-    for i in range(MTHR):
-        th = threading.Thread(target=worker, args=(proxy, i, ), )
+    delta = 60
+    assert threading.active_count() is 1
+    started = 0
+    while threading.active_count() == started + 1:
+        th = threading.Thread(target=worker, args=(proxy, started, ), )
         th.start()
-        time.sleep(1.03*delta)
-        delta *= 2
+        started += 1
+        try:
+            sleep(delta)
+        except KeyboardInterrupt:
+            break
+    log('started {0:d} worker threads'.format(started))
+    log('still waiting for {0:d} worker threads'
+        .format(threading.active_count()-1))
 
 
-def worker(proxy, id):
+def worker(proxy, wid):
 
     with protocol.clone(proxy, persistent=True) as pers:
-        log('**[{0:02d}   ] {1}'.format(id, pers.conn))
+        try:
+            pers.ping()
+        except protocol.Error as exc:
+            log('xx[{0:02d}   ] {1}'.format(wid, exc))
+            return
 
-        iter = 0
+        tlast = monotonic()
+        conn = pers.conn
+        log('**[{0:02d}   ] {1}'.format(wid, pers.conn))
+
+        gen = 0
         nap = 1
         while True:
-            time.sleep(nap)
+            sleep(nap)
             try:
-                _ = pers.dir()
-                log('..[{0:02d}.{1:02d}] {2}'.format(
-                    id, iter, pers.conn))
+                pers.dir()
+                tlast = monotonic()
+                log('..[{0:02d}.{1:02d}]'.format(wid, gen))
+                if pers.conn is not conn:
+                    log('..[{0:02d}.{1:02d}] {2}'.format(
+                        wid, gen, pers.conn))
+                    conn = pers.conn
             except protocol.Error as exc:
-                log('!![{0:02d}] dead after {1:d}s: {2}'.format(id, nap, exc))
+                log('!![{0:02d}.{1:02d}] dead after {2:.1f}s: {3}'.format(
+                    wid, gen, monotonic() - tlast, exc))
                 break
-            iter += 1
+            gen += 1
             nap *= 2
 
 
