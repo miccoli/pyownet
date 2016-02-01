@@ -135,8 +135,11 @@ class Test_misc(unittest.TestCase):
         # check edge conditions in which _OwnetConnection.__str__ could fail
         p = protocol.proxy(HOST, PORT, persistent=True)
         p.ping()
-        p.conn.shutdown()
-        str(p.conn)  # could fail if not able to determine socket peername
+        if p.conn:
+            p.conn.shutdown()
+            str(p.conn)  # could fail if not able to determine socket peername
+        else:
+            self.skipTest('unable to create a persistent connection')
 
 if __name__ == '__main__':
     unittest.main()

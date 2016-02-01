@@ -4,6 +4,9 @@ Changelog
 v0.9.1 (devel)
 --------------
 
+Per call ``timeout`` API implemented.
+
+- restructure ``proxy()`` factory to avoid circular ref. on saved exception
 - modify ``_OwnetConnection`` to ensure that a persistent connection is
   closed on errors (relevant for timeouts and other connection errors)
 - implemented explicit timeout on ownet protocol methods;

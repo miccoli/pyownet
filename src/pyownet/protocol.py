@@ -567,7 +567,8 @@ class _Proxy(object):
         """sends a NOP packet and waits response; returns None"""
 
         ret, data = self.sendmess(MSG_NOP, bytes())
-        assert ret <= 0 and not data, (ret, data)
+        if data or ret > 0:
+            raise ProtocolError('invalid reply to ping message')
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret])
 
@@ -707,40 +708,34 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
     except socket.gaierror as err:
         raise ConnError(*err.args)
 
-    # gai is a list of tuples, search for the first working one
-    lasterr = None
+    # gai is a (non empty) list of tuples, search for the first working one
+    assert gai
     for (family, _type, _proto, _, sockaddr) in gai:
         assert _type is socket.SOCK_STREAM and _proto is socket.IPPROTO_TCP
-        owp = _PersistentProxy(family, sockaddr, flags, verbose)
+        owp = _Proxy(family, sockaddr, flags, verbose)
         try:
             # check if there is an owserver listening
             owp.ping()
         except ConnError as err:
             # no connection, go over to next sockaddr
-            lasterr = err
+            lasterr = err.args
+            continue
         else:
             # ok, live owserver found, stop searching
             break
     else:
         # no server listening on (family, sockaddr) found:
-        # reraise last ConnError
-        assert isinstance(lasterr, ConnError)
-        raise lasterr
+        raise ConnError(*lasterr)
 
-    # here 'owp' points to a live owserver.
-    # if persistence is granted, there could be an open connection
-    # at 'owp.conn'
+    # init errno to errmessage mapping
+    # FIXME: should this be only optional?
+    owp._init_errcodes()
 
-    with owp:
-        # init errno to errmessage mapping
-        # FIXME: should this  be only optional?
-        owp._init_errcodes()
+    if persistent:
+        owp = clone(owp, persistent=True)
 
-    # at exit of the 'with' context above the connection is closed
-    assert owp.conn is None
-
-    if not persistent:
-        owp = clone(owp, persistent=False)
+    # here we should have all connections closed
+    assert not isinstance(owp, _PersistentProxy) or owp.conn is None
 
     return owp
 
