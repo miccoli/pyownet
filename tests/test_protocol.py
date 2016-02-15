@@ -133,7 +133,10 @@ class Test_misc(unittest.TestCase):
 
     def test_str(self):
         # check edge conditions in which _OwnetConnection.__str__ could fail
-        p = protocol.proxy(HOST, PORT, persistent=True)
+        try:
+            p = protocol.proxy(HOST, PORT, persistent=True)
+        except protocol.Error as exc:
+            self.skipTest('no owserver on %s:%s, got:%s' % (HOST, PORT, exc))
         p.ping()
         if p.conn:
             p.conn.shutdown()
