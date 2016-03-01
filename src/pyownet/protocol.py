@@ -548,6 +548,9 @@ class _Proxy(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
+    def _new_connection(self):
+        return _OwnetConnection(self._sockaddr, self._family, self.verbose)
+
     def sendmess(self, msgtype, payload, flags=0, size=0, offset=0, timeout=0):
         """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
@@ -556,8 +559,7 @@ class _Proxy(object):
         flags |= self.flags
         assert not (flags & FLG_PERSISTENCE)
 
-        with _OwnetConnection(
-                self._sockaddr, self._family, self.verbose) as conn:
+        with self._new_connection() as conn:
             ret, _, data = conn.req(
                 msgtype, payload, flags, size, offset, timeout)
 
@@ -648,6 +650,8 @@ class _PersistentProxy(_Proxy):
         self.flags |= FLG_PERSISTENCE
 
     def __enter__(self):
+        if not self.conn:
+            self.conn = self._new_connection()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -670,10 +674,7 @@ class _PersistentProxy(_Proxy):
         """
 
         # reuse last valid connection or create new
-        conn = self.conn or _OwnetConnection(self._sockaddr,
-                                             self._family,
-                                             self.verbose)
-
+        conn = self.conn or self._new_connection()
         # invalidate last connection
         self.conn = None
 

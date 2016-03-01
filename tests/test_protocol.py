@@ -10,7 +10,8 @@ from . import (HOST, PORT)
 
 
 def setUpModule():
-    "gloabal setup"
+    """global setup"""
+    # no global setup needed, for now
 
 
 class _TestProxyMix(object):
@@ -26,8 +27,8 @@ class _TestProxyMix(object):
         self.assertIsNone(self.proxy.ping())
 
     def test_present(self):
-        self.assertIs(self.proxy.present('/'), True)
-        self.assertIs(self.proxy.present('/nonexistent'), False)
+        self.assertTrue(self.proxy.present('/'))
+        self.assertFalse(self.proxy.present('/nonexistent'))
 
     def test_dir_read(self):
         for i in self.proxy.dir(bus=False):
@@ -43,6 +44,17 @@ class _TestProxyMix(object):
         self.assertRaises(TypeError, self.proxy.dir, 1)
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
+
+    def test_context(self):
+        with self.proxy as owp:
+            try:
+                self.assertIsInstance(owp.conn, protocol._OwnetConnection)
+            except AttributeError:
+                pass
+        try:
+            self.assertIsNone(owp.conn)
+        except AttributeError:
+            pass
 
 
 class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):

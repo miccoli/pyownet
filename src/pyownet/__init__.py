@@ -18,7 +18,7 @@
 #
 
 __all__ = ['__version__', 'Error']
-__version__ = '0.9.1.dev6'
+__version__ = '0.9.1.dev7'
 
 
 class Error(Exception):

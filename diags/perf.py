@@ -1,5 +1,6 @@
 from __future__ import print_function
 import sys
+import platform
 import timeit
 import argparse
 if sys.version_info < (3, ):
@@ -57,6 +58,9 @@ def main():
     number = args.number
     repeat = args.repeat
 
+    print('python  : {} {} on {}'.format(platform.python_implementation(),
+                                         platform.python_version(),
+                                         platform.platform(terse=True),))
     print('{:8s}: {}'.format(pyownet.__name__, pyownet.__version__))
     print('owproxy : {}'.format(base))
     print('owserver: pid {}, ver. {}'.format(pid, ver))
