@@ -1,20 +1,30 @@
-#
-# check issue #8
-#
+"""
+check issue #8
+"""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+__all__ = ['main']
+
+import sys
+import traceback
 import signal
 import time
 import platform
+import random
 import pyownet
 from pyownet import protocol
 from . import (HOST, PORT)
 
-count = 0
+A = 1e-3  # alarm interval
+B = 1e-1  # max sleep in busy wait
 
 
 def dummy_handler(signum, frame):
     """dummy signal handler"""
-    global count
-    count += 1
 
 
 def main():
@@ -23,24 +33,34 @@ def main():
     print(platform.system(), platform.release())
     print(pyownet.__name__, pyownet.__version__)
 
-    owp = protocol.proxy(HOST, PORT)
-    ref = owp.dir()
+    owp = protocol.proxy(HOST, PORT, flags=protocol.FLG_UNCACHED)
+    print(owp, 'vers.',
+          protocol.bytes2str(owp.read(protocol.PTH_VERSION))
+          if owp.present(protocol.PTH_VERSION) else 'unknown')
 
     signal.signal(signal.SIGALRM, dummy_handler)
     tic = time.time()
-    signal.setitimer(signal.ITIMER_REAL, 2, 0.01)
+    signal.setitimer(signal.ITIMER_REAL, A, A)
 
     try:
-        while True:
+        count = 0
+        inter = 0
+        while count < 10000:
+            count += 1
             try:
-                cur = owp.dir()
-                assert cur == ref
+                res = owp.dir()
             except protocol.Error as exc:
-                print(count, exc)
-            time.sleep(0.2)
+                (_, val, tb) = sys.exc_info()
+                assert val is exc
+                inter += 1
+                trs = traceback.extract_tb(tb)
+                print(count, exc, trs[-1][0], trs[-1][1])
+            time.sleep(random.uniform(0., B))  # can be interrupted
     except KeyboardInterrupt:
-        elt = time.time() - tic
-        print('{:d} {:.1f}s {:.3f}s'.format(count, elt, elt/count))
+        print()
+    signal.setitimer(signal.ITIMER_REAL, 0, A)
+    elt = time.time() - tic
+    print('{:d} errors / {:d} calls in {:.1f}s'.format(inter, count, elt))
 
 if __name__ == '__main__':
     main()

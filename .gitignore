@@ -6,8 +6,10 @@ dist/
 *.py[cod]
 __pycache__/
 
-# tox
+# tox & coverage
 .tox
+.coverage
+/htmlcov
 
 # docutil generated
 /README.html
