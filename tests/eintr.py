@@ -48,7 +48,7 @@ def main():
         while count < 10000:
             count += 1
             try:
-                res = owp.dir()
+                _ = owp.dir()
             except protocol.Error as exc:
                 (_, val, tb) = sys.exc_info()
                 assert val is exc

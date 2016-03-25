@@ -1,8 +1,8 @@
 Changelog
 =========
 
-v0.9.1 (devel)
---------------
+v0.10.0 (release candidate)
+---------------------------
 
 Per call ``timeout`` API implemented.
 

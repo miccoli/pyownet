@@ -26,6 +26,7 @@ setup(
     author_email='stefano.miccoli@polimi.it',
     url='https://github.com/miccoli/pyownet',
     license='GPL',
+    keywords=['OWFS', ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Other Environment',
