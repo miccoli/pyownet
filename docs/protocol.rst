@@ -418,20 +418,23 @@ Concrete exceptions
 
 .. py:exception:: ConnError
 
-   This exception is raised when
-
-   - a network connection to the owserver cannot be established,
-   - a system function error occurs during socket operations, or
-   - a socket timeout occurs at the OS level.
-
-   In fact ``ConnError`` simply wraps the causing `OSError`_ exception
+   This exception is raised when a low level socket system call fails.
+   In fact ``ConnError`` simply wraps the Python `OSError`_ exception
    along with all its arguments, from which it inherits. In other
-   terms it is typically implemented as ::
+   terms it is implemented as ::
 
      try:
-         # do some socket exception
+         # call some socket method/function
      except OSError as exc:
          raise ConnError(*exc.args)
+
+   Typical situations in which this exception occurs are when
+
+   - a network connection to the owserver cannot be established,
+   - a socket timeout occurs at the OS level.
+
+   For Python versions prior to 3.5, this exception could also be raised for
+   an interrupted system call, see :pep:`475` [#eintr_issue]_.
 
 .. py:exception:: ProtocolError
 
@@ -596,3 +599,6 @@ D       a single dot character '.'
 .. rubric:: Footnotes
 
 .. [#alpha] Subject to change while package is in alpha phase.
+
+.. [#eintr_issue] See also `issue #8
+   <https://github.com/miccoli/pyownet/issues/8>`_.
