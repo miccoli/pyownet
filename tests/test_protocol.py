@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 if sys.version_info < (2, 7, ):
     import unittest2 as unittest
@@ -10,7 +15,8 @@ from . import (HOST, PORT)
 
 
 def setUpModule():
-    "gloabal setup"
+    """global setup"""
+    # no global setup needed, for now
 
 
 class _TestProxyMix(object):
@@ -26,8 +32,8 @@ class _TestProxyMix(object):
         self.assertIsNone(self.proxy.ping())
 
     def test_present(self):
-        self.assertIs(self.proxy.present('/'), True)
-        self.assertIs(self.proxy.present('/nonexistent'), False)
+        self.assertTrue(self.proxy.present('/'))
+        self.assertFalse(self.proxy.present('/nonexistent'))
 
     def test_dir_read(self):
         for i in self.proxy.dir(bus=False):
@@ -43,6 +49,17 @@ class _TestProxyMix(object):
         self.assertRaises(TypeError, self.proxy.dir, 1)
         self.assertRaises(TypeError, self.proxy.write, '/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
+
+    def test_context(self):
+        with self.proxy as owp:
+            try:
+                self.assertIsInstance(owp.conn, protocol._OwnetConnection)
+            except AttributeError:
+                pass
+        try:
+            self.assertIsNone(owp.conn)
+        except AttributeError:
+            pass
 
 
 class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
@@ -130,6 +147,19 @@ class Test_misc(unittest.TestCase):
         self.assertRaises(TypeError, protocol.clone, 1)
         self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
         self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)
+
+    def test_str(self):
+        # check edge conditions in which _OwnetConnection.__str__ could fail
+        try:
+            p = protocol.proxy(HOST, PORT, persistent=True)
+        except protocol.Error as exc:
+            self.skipTest('no owserver on %s:%s, got:%s' % (HOST, PORT, exc))
+        p.ping()
+        if p.conn:
+            p.conn.shutdown()
+            str(p.conn)  # could fail if not able to determine socket peername
+        else:
+            self.skipTest('unable to create a persistent connection')
 
 if __name__ == '__main__':
     unittest.main()

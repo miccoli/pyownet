@@ -14,11 +14,6 @@ else:
 # setup config parser
 config = ConfigParser()
 
-# default values
-config.add_section('server')
-config.set('server', 'host', 'localhost')
-config.set('server', 'port', '4304')
-
 # load config files
 config.read(os.path.join(i, 'tests.ini') for i in __path__+['.'])
 

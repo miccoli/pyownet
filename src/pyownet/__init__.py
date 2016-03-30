@@ -1,7 +1,7 @@
 """python owserver client"""
 
 #
-# Copyright 2013-2015 Stefano Miccoli
+# Copyright 2013-2016 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,8 +18,12 @@
 #
 
 __all__ = ['__version__', 'Error']
-__version__ = '0.9.0'
+__version__ = '0.10.0'
 
 
 class Error(Exception):
     """Base class for all package errors"""
+
+# map legacy classes to protocol module
+from . import (protocol, legacy)
+protocol.OwnetProxy = legacy.OwnetProxy
