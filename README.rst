@@ -2,7 +2,7 @@ pyownet: Python OWFS client library (owserver protocol)
 =======================================================
 
 .. image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
-   :target: http://pyownet.readthedocs.org/en/latest/
+   :target: http://pyownet.readthedocs.io/en/latest/
    :alt: Package Documentation
 
 .. image:: https://img.shields.io/pypi/v/pyownet.svg
@@ -45,7 +45,7 @@ Documentation
 -------------
 
 Full package documentation is available at
-http://pyownet.readthedocs.org/en/latest/
+http://pyownet.readthedocs.io/en/latest/
 
 
 .. _owserver: http://owfs.org/index.php?page=owserver_protocol
