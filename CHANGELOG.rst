@@ -4,6 +4,8 @@ Changelog
 v0.10.1 (devel)
 ---------------
 
+- Python2 uses ``str`` instead of ``unicode`` for pathnames.
+  (E.g. the return of ``proxy().dir()``)
 - Support for Python 3.2 dropped (no more unit testing.)
 
 v0.10.0 (2016-03-30)

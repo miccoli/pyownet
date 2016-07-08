@@ -9,13 +9,13 @@ function 'proxy'.
 
 >>> owproxy = proxy(host="owserver.example.com", port=4304)
 >>> owproxy.dir()
-[u'/28.000028D70000/', u'/26.000026D90100/']
+['/28.000028D70000/', '/26.000026D90100/']
 >>> owproxy.read('/28.000028D70000/temperature')
 '           4'
 >>> owproxy.write('/28.000028D70000/alias', 'sensA')
 >>> owproxy.write('/26.000026D90100/alias', 'sensB')
 >>> owproxy.dir()
-[u'/sensA/', u'/sensB/']
+['/sensA/', '/sensB/']
 >>> owproxy.read('/sensA/temperature')
 '           4'
 >>> owproxy.read('/sensB/temperature')
@@ -137,20 +137,29 @@ if __debug__:
 # code/decode functions
 #
 
+if str is bytes:
+    # python2 semantic
+    _b2s = _s2b = lambda x: x
+else:
+    # python3 semantic
+    _b2s = lambda x: x.decode('ascii')
+    _s2b = lambda x: x.encode('ascii')
+
+
 def str2bytez(s):
     """Transform string to zero-terminated bytes."""
 
-    if not isinstance(s, basestring):
+    if not isinstance(s, str):
         raise TypeError()
-    return s.encode('ascii') + b'\x00'
+    return _s2b(s) + b'\x00'
 
 
 def bytes2str(b):
     """Transform bytes to string."""
 
-    if not isinstance(b, (bytes, bytearray, )):
+    if not isinstance(b, (bytes, )):
         raise TypeError()
-    return b.decode('ascii')
+    return _b2s(b)
 
 
 #
