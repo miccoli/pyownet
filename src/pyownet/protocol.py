@@ -443,7 +443,7 @@ class _OwnetConnection(object):
         # instead of aborted.
         # FIXME FIXME FIXME
         if sent < len(header + payload):
-            raise ShortWrite(sent, len(header+payload))
+            raise ShortWrite(sent, len(header + payload))
         assert sent == len(header + payload), sent
 
     def _read_msg(self):
@@ -628,7 +628,7 @@ class _Proxy(object):
         if not isinstance(data, (bytes, bytearray, )):
             raise TypeError("'data' argument must be binary")
 
-        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
+        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path) + data,
                                    size=len(data), offset=offset,
                                    timeout=timeout)
         assert not rdata, (ret, rdata)

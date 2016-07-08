@@ -15,7 +15,7 @@ else:
 config = ConfigParser()
 
 # load config files
-config.read(os.path.join(i, 'tests.ini') for i in __path__+['.'])
+config.read(os.path.join(i, 'tests.ini') for i in __path__ + ['.'])
 
 # export public API constants
 HOST = config.get('server', 'host')

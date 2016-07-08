@@ -20,12 +20,12 @@ classes and code in this module will go away, soon or later
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-__all__ = ['OwnetProxy', ]
-
 import warnings
 import socket
 from .protocol import (_Proxy, _errtuple, FLG_OWNET, PTH_ERRCODES,
                        ConnError, OwnetError, bytes2str)
+
+__all__ = ['OwnetProxy', ]
 
 
 #
