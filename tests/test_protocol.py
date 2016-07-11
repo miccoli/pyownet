@@ -11,7 +11,7 @@ else:
 import warnings
 
 from pyownet import protocol
-from . import (HOST, PORT)
+from . import (HOST, PORT, FAKEHOST, FAKEPORT)
 
 
 def setUpModule():
@@ -143,7 +143,7 @@ class Test_misc(unittest.TestCase):
         self.assertRaises(protocol.ConnError, protocol.proxy,
                           host=HOST, port=-1)
         self.assertRaises(protocol.ProtocolError, protocol.proxy,
-                          host='www.google.com', port=80)
+                          host=FAKEHOST, port=FAKEPORT)
         self.assertRaises(TypeError, protocol.clone, 1)
         self.assertRaises(TypeError, protocol._FromServerHeader, bad=0)
         self.assertRaises(TypeError, protocol._ToServerHeader, bad=0)

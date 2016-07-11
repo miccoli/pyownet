@@ -20,3 +20,5 @@ config.read(os.path.join(i, 'tests.ini') for i in __path__ + ['.'])
 # export public API constants
 HOST = config.get('server', 'host')
 PORT = config.get('server', 'port')
+FAKEHOST = config.get('fake server', 'host')
+FAKEPORT = config.get('fake server', 'port')
