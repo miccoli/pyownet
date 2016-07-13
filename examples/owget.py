@@ -38,32 +38,6 @@ __all__ = ['main']
 def main():
     """parse commandline arguments and print result"""
 
-    #
-    # setup command line parsing a la argpase
-    #
-    parser = argparse.ArgumentParser()
-
-    # positional args
-    parser.add_argument('uri', metavar='URI', nargs='?', default='/',
-                        help='[owserver:]//hostname:port/path')
-
-    # optional args for temperature scale
-    parser.set_defaults(t_flags=protocol.FLG_TEMP_C)
-    tempg = parser.add_mutually_exclusive_group()
-    tempg.add_argument('-C', '--Celsius', const=protocol.FLG_TEMP_C,
-                       help='Celsius(default) temperature scale',
-                       dest='t_flags', action='store_const', )
-    tempg.add_argument('-F', '--Fahrenheit', const=protocol.FLG_TEMP_F,
-                       help='Fahrenheit temperature scale',
-                       dest='t_flags', action='store_const', )
-    tempg.add_argument('-K', '--Kelvin', const=protocol.FLG_TEMP_K,
-                       help='Kelvin temperature scale',
-                       dest='t_flags', action='store_const', )
-    tempg.add_argument('-R', '--Rankine', const=protocol.FLG_TEMP_R,
-                       help='Rankine temperature scale',
-                       dest='t_flags', action='store_const', )
-
-    # optional arg for address format
     fcodes = collections.OrderedDict((
         ('f.i', protocol.FLG_FORMAT_FDI),
         ('fi', protocol.FLG_FORMAT_FI),
@@ -71,20 +45,72 @@ def main():
         ('f.ic', protocol.FLG_FORMAT_FDIC),
         ('fi.c', protocol.FLG_FORMAT_FIDC),
         ('fic', protocol.FLG_FORMAT_FIC), ))
-    parser.set_defaults(format='f.i')
-    parser.add_argument('-f', '--format', choices=fcodes,
-                        help='format for 1-wire unique serial IDs display')
 
-    # optional arg for output format
-    tempg = parser.add_mutually_exclusive_group()
-    tempg.add_argument('--hex', action='store_true',
-                       help='write data in hex format')
-    tempg.add_argument('-b', '--binary', action='store_true',
-                       help='output binary data')
+    def make_parser():
+        # command line parsing
+
+        parser = argparse.ArgumentParser()
+
+        # positional args
+        parser.add_argument('uri', metavar='URI', nargs='?', default='/',
+                            help='[owserver:]//hostname:port/path')
+
+        # optional args for temperature scale
+        parser.set_defaults(t_flags=protocol.FLG_TEMP_C)
+        tempg = parser.add_mutually_exclusive_group()
+        tempg.add_argument('-C', '--Celsius', const=protocol.FLG_TEMP_C,
+                           help='Celsius(default) temperature scale',
+                           dest='t_flags', action='store_const', )
+        tempg.add_argument('-F', '--Fahrenheit', const=protocol.FLG_TEMP_F,
+                           help='Fahrenheit temperature scale',
+                           dest='t_flags', action='store_const', )
+        tempg.add_argument('-K', '--Kelvin', const=protocol.FLG_TEMP_K,
+                           help='Kelvin temperature scale',
+                           dest='t_flags', action='store_const', )
+        tempg.add_argument('-R', '--Rankine', const=protocol.FLG_TEMP_R,
+                           help='Rankine temperature scale',
+                           dest='t_flags', action='store_const', )
+
+        # optional arg for address format
+        parser.set_defaults(format='f.i')
+        parser.add_argument('-f', '--format', choices=fcodes,
+                            help='format for 1-wire unique serial IDs display')
+
+        # optional arg for output format
+        tempg = parser.add_mutually_exclusive_group()
+        tempg.add_argument('--hex', action='store_true',
+                           help='write data in hex format')
+        tempg.add_argument('-b', '--binary', action='store_true',
+                           help='output binary data')
+
+        return parser
+
+    def print_data(data):
+        # format and print data
+
+        if args.binary:
+            if sys.version_info < (3, ):
+                sys.stdout.write(data)
+            else:
+                sys.stdout.buffer.write(data)
+        else:
+            if args.hex:
+                data = hexlify(data)
+            else:
+                try:
+                    data = data.decode('ascii')
+                except UnicodeDecodeError:
+                    data = repr(data)
+            print(data)
 
     #
-    # parse command line args
+    # main program starts here
     #
+
+    #
+    # parse command line arguments
+    #
+    parser = make_parser()
     args = parser.parse_args()
 
     #
@@ -111,35 +137,30 @@ def main():
         owproxy = protocol.proxy(
             host, port, flags=args.t_flags | fcodes[args.format], )
     except protocol.ConnError as error:
-        print("Unable to open connection to '{0}:{1}'\n{2}"
+        print("Unable to open connection to '{0}:{1}'\nSystem error: {2}"
               .format(host, port, error), file=sys.stderr)
         sys.exit(1)
     except protocol.ProtocolError as error:
-        print("Protocol error, '{0}:{1}' not an owserver?\n{2}"
+        print("'{0}:{1}' not an owserver?\nProtocol error: {2}"
               .format(host, port, error), file=sys.stderr)
         sys.exit(1)
 
+    #
+    # query owserver and print results
+    #
     try:
         if urlc.path.endswith('/'):
             for path in owproxy.dir(urlc.path, bus=True):
                 print(path)
         else:
             data = owproxy.read(urlc.path)
-            if args.binary:
-                if sys.version_info < (3, ):
-                    sys.stdout.write(data)
-                else:
-                    sys.stdout.buffer.write(data)
-            else:
-                if args.hex:
-                    data = hexlify(data)
-                print(data.decode('ascii', errors='backslashreplace'))
+            print_data(data)
     except protocol.OwnetError as error:
-        print("Ownet error\n{2}"
+        print("Remote server error: {2}"
               .format(host, port, error), file=sys.stderr)
         sys.exit(1)
     except protocol.ProtocolError as error:
-        print("Protocol error, '{0}:{1}' buggy?\n{2}"
+        print("'{0}:{1}' buggy?\nProtocol error: {2}"
               .format(host, port, error), file=sys.stderr)
         sys.exit(1)
 
