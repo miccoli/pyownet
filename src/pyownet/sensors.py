@@ -1,7 +1,7 @@
 # sensors
 
 #
-# Copyright 2013, 2015 Stefano Miccoli
+# Copyright 2013, 2016 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -75,7 +75,7 @@ class Properties(object):
     def __str__(self):
         return 'Properties: %s, %2d, %2d, %s, %3d, %s' % (
             self.type, self.isarr, self.arrlen, self.mode, self.len, self.pers,
-            )
+        )
 
 
 def _pathname_mangle(path):
@@ -162,7 +162,7 @@ class Root(object):
             self._structure[family] = dict(
                 (i.split('/', 3)[-1], Properties(j))
                 for i, j in self._walk(protocol.PTH_STRUCTURE + family + '/')
-                )
+            )
         return self._structure[family]
 
     def scan(self):
@@ -215,20 +215,20 @@ def _main():
 
 
 def _recprint(prefix, s):
-    fprint = lambda s1, s2: print(prefix+'{0!s:.<14} {1!r}'.format(s1, s2))
+    fprint = lambda s1, s2: print(prefix + '{0!s:.<14} {1!r}'.format(s1, s2))
     for att in dir(s):
         fatt = getattr(s, att, None)
         if isinstance(fatt, types.FunctionType):
             try:
-                fprint(att+'()', fatt(), )
+                fprint(att + '()', fatt(), )
             except protocol.OwnetError as exp:
-                fprint(att+'()', exp, )
+                fprint(att + '()', exp, )
         elif isinstance(fatt, str) and not fatt.startswith('__'):
             fprint(att, fatt)
         elif isinstance(fatt, _sensor):
-            head = prefix+att+'/'
+            head = prefix + att + '/'
             print(head)
-            _recprint(' '*(len(head)-1) + prefix, fatt)
+            _recprint(' ' * (len(head) - 1) + prefix, fatt)
 
 
 if __name__ == '__main__':
