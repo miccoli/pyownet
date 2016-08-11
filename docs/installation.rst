@@ -16,7 +16,7 @@ and is the main developing language. Running the ``2to3`` tool will
 generate valid and, whenever possible, idiomatic Python 3 code. The
 present documentation refers to the Python 3 version of the package.
 
-Explicitly supported versions are Python 2.6, 2.7, 3.2 through 3.5.
+Explicitly supported versions are Python 2.6, 2.7, 3.3 through 3.5.
 
 Install from PyPI
 -----------------

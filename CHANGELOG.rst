@@ -1,6 +1,11 @@
 Changelog
 =========
 
+v0.10.1 (devel)
+---------------
+
+- Support for Python 3.2 dropped (no more unit testing.)
+
 v0.10.0 (2016-03-30)
 --------------------
 
