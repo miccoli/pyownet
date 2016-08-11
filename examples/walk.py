@@ -104,7 +104,7 @@ def main():
             host, port, flags=args.t_flags | fcodes[args.format],
             persistent=True)
     except (protocol.ConnError, protocol.ProtocolError) as error:
-        parser.exit(status=1, message=str(error)+'\n')
+        parser.exit(status=1, message=str(error) + '\n')
 
     def walk(path):
         try:

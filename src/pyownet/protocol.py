@@ -4,22 +4,27 @@ This module is a pure python, low level implementation of the owserver
 protocol.
 
 Interaction with an owserver takes place via a proxy object whose methods
-correspond to owserver messages. Proxy objects are created by factory function
-'proxy'.
+correspond to owserver messages. Proxy objects are created by factory
+function 'proxy'.
 
 >>> owproxy = proxy(host="owserver.example.com", port=4304)
 >>> owproxy.dir()
-[u'/10.67C6697351FF/', u'/05.4AEC29CDBAAB/']
->>> owproxy.read('/10.67C6697351FF/temperature')
-'     91.6195'
->>> owproxy.write('/10.67C6697351FF/alias', str2bytez('sensA'))
+['/28.000028D70000/', '/26.000026D90100/']
+>>> owproxy.read('/28.000028D70000/temperature')
+'           4'
+>>> owproxy.write('/28.000028D70000/alias', 'sensA')
+>>> owproxy.write('/26.000026D90100/alias', 'sensB')
 >>> owproxy.dir()
-[u'/sensA/', u'/05.4AEC29CDBAAB/']
+['/sensA/', '/sensB/']
+>>> owproxy.read('/sensA/temperature')
+'           4'
+>>> owproxy.read('/sensB/temperature')
+'         3.9'
 
 """
 
 #
-# Copyright 2013-2015 Stefano Miccoli
+# Copyright 2013-2016 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,10 +42,13 @@ correspond to owserver messages. Proxy objects are created by factory function
 
 from __future__ import print_function
 
-import sys
-import warnings
 import struct
 import socket
+try:
+    from time import monotonic
+except ImportError:
+    # pretend that time.time is monotonic
+    from time import time as monotonic
 
 from . import Error as _Error
 
@@ -130,26 +138,29 @@ if __debug__:
 # code/decode functions
 #
 
+if str is bytes:
+    # python2 semantic
+    _b2s = _s2b = lambda x: x
+else:
+    # python3 semantic
+    _b2s = lambda x: x.decode('ascii')
+    _s2b = lambda x: x.encode('ascii')
+
+
 def str2bytez(s):
     """Transform string to zero-terminated bytes."""
 
-    if not isinstance(s, basestring):
+    if not isinstance(s, str):
         raise TypeError()
-    return s.encode('ascii') + b'\x00'
-
-
-if sys.version_info < (3, ):
-    _tostr = lambda x: str(x)
-else:
-    _tostr = lambda x: str(x, 'ascii')
+    return _s2b(s) + b'\x00'
 
 
 def bytes2str(b):
     """Transform bytes to string."""
 
-    if not isinstance(b, (bytes, bytearray, )):
+    if not isinstance(b, (bytes, )):
         raise TypeError()
-    return _tostr(b)
+    return _b2s(b)
 
 
 #
@@ -161,7 +172,8 @@ class Error(_Error):
 
 
 class ConnError(Error, IOError):
-    """Raised if no valid connection can be established with owserver."""
+    """Raised when a socket call returns an error."""
+    # FIXME: since python 3.3 IOError is an alias for OSError
 
 
 class ProtocolError(Error):
@@ -181,15 +193,42 @@ class MalformedHeader(ProtocolError):
 
 
 class ShortRead(ProtocolError):
-    """Raised if not enough date received."""
+    """Raised if not enough data received."""
+
+    def __init__(self, read, expected):
+        self.read = read
+        self.expected = expected
+
+    def __str__(self):
+        return "received {0.read} bytes instead of {0.expected}.".format(self)
 
 
 class ShortWrite(ProtocolError):
     """Raised if unable to write all data."""
 
+    def __init__(self, sent, tosend):
+        self.sent = sent
+        self.tosend = tosend
+
+    def __str__(self):
+        return "sent {0.sent} bytes instead of {0.tosend}.".format(self)
+
 
 class OwnetError(Error, EnvironmentError):
     """Raised when owserver returns error code"""
+    # FIXME: since python 3.3 EnvironmentError is an alias for OSError
+
+
+class OwnetTimeout(Error):
+    """Raised if response of server takes longer than a given timeout."""
+
+    def __init__(self, elapsed, timeout):
+        self.elapsed = elapsed
+        self.timeout = timeout
+
+    def __str__(self):
+        return ("Communication with owserver aborted after {0.elapsed:.1f}s, "
+                "timeout of {0.timeout:.1f}s exceeded".format(self))
 
 
 #
@@ -313,15 +352,32 @@ class _OwnetConnection(object):
         """establish a connection with server at sockaddr"""
 
         self.verbose = verbose
+        self.peername = None
 
-        self.socket = socket.socket(family, socket.SOCK_STREAM)
+        self.socket = socket.socket(family=family,
+                                    type=socket.SOCK_STREAM,
+                                    proto=socket.IPPROTO_TCP)
         self.socket.settimeout(_SCK_TIMEOUT)
         # FIXME: is _SO_KEEPALIVE really useful?
         self.socket.setsockopt(_SOL_SOCKET, _SO_KEEPALIVE, 1)
-        self.socket.connect(sockaddr)
+
+        try:
+            self.socket.connect(sockaddr)
+        except IOError as err:
+            raise ConnError(*err.args)
+
+        assert self.socket.getpeername() == sockaddr
+        self.peername = sockaddr
 
         if self.verbose:
-            print(self.socket.getsockname(), '->', self.socket.getpeername())
+            print(self.socket.getsockname(), '->', self.peername)
+
+    def __del__(self):
+
+        if self.verbose:
+            print(self.socket.getsockname(), 'XX', self.peername)
+
+        self.socket.close()
 
     def __enter__(self):
         return self
@@ -331,36 +387,54 @@ class _OwnetConnection(object):
 
     def __str__(self):
         return "_OwnetConnection {0} -> {1}".format(self.socket.getsockname(),
-                                                    self.socket.getpeername())
+                                                    self.peername)
 
     def shutdown(self):
         """shutdown connection"""
 
         if self.verbose:
-            print(self.socket.getsockname(), 'xx', self.socket.getpeername())
+            print(self.socket.getsockname(), 'xx', self.peername)
 
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
         except IOError as err:
             assert err.errno is _ENOTCONN, "unexpected IOError: %s" % err
+            # remote peer has already closed the connection,
+            # just ignore the exceeption
             pass
-        self.socket.close()
+        # FIXME: should explicitly close socket here, or is it sufficient
+        # to close upon garbage collection? (see __del__ above)
+        # self.socket.close()
 
-    def req(self, msgtype, payload, flags, size=0, offset=0):
+    def req(self, msgtype, payload, flags, size=0, offset=0, timeout=0):
         """send message to server and return response"""
+
+        if timeout < 0:
+            raise ValueError("timeout cannot be negative!")
 
         tohead = _ToServerHeader(payload=len(payload), type=msgtype,
                                  flags=flags, size=size, offset=offset)
+
+        tstartcom = monotonic()  # set timer when communication begins
         self._send_msg(tohead, payload)
+
         while True:
             fromhead, data = self._read_msg()
 
-            if fromhead.payload < 0 and msgtype != MSG_NOP:
-                # Server said PING to keep connection alive during
-                # lenghty op
-                continue
+            if fromhead.payload >= 0:
+                # we received a valid answer and return the result
+                return fromhead.ret, fromhead.flags, data
 
-            return fromhead.ret, fromhead.flags, data
+            assert msgtype != MSG_NOP
+
+            # we did not exit the loop because payload is negative
+            # Server said PING to keep connection alive during lenghty op
+
+            # check if timeout has expired
+            if timeout:
+                tcom = monotonic() - tstartcom
+                if tcom > timeout:
+                    raise OwnetTimeout(tcom, timeout)
 
     def _send_msg(self, header, payload):
         """send message to server"""
@@ -369,38 +443,63 @@ class _OwnetConnection(object):
             print('->', repr(header))
             print('..', repr(payload))
         assert header.payload == len(payload)
-        sent = self.socket.send(header + payload)
+        try:
+            sent = self.socket.send(header + payload)
+        except IOError as err:
+            raise ConnError(*err.args)
+
+        # FIXME FIXME FIXME:
+        # investigate under which situations socket.send should be retried
+        # instead of aborted.
+        # FIXME FIXME FIXME
         if sent < len(header + payload):
-            raise ShortWrite()
+            raise ShortWrite(sent, len(header + payload))
         assert sent == len(header + payload), sent
-
-    #
-    # NOTE:
-    # '_read_socket(self, nbytes)' was implemented as
-    # 'return self.socket.recv(nbytes, socket.MSG_WAITALL)'
-    # but socket.MSG_WAITALL proved not reliable
-    #
-
-    def _read_socket(self, nbytes):
-        """read nbytes bytes from self.socket"""
-
-        buf = self.socket.recv(nbytes)
-        while len(buf) < nbytes:
-            tmp = self.socket.recv(nbytes - len(buf))
-            if len(tmp) == 0:
-                if self.verbose and buf:
-                    print('ee', repr(buf))
-                raise ShortRead("short read: read %d bytes instead of %d"
-                                % (len(buf), nbytes, ))
-            buf += tmp
-        assert len(buf) == nbytes, (buf, len(buf), nbytes)
-        return buf
 
     def _read_msg(self):
         """read message from server"""
 
-        header = _FromServerHeader(self._read_socket(_FromServerHeader
-                                                     .header_size))
+        #
+        # NOTE:
+        # '_recv_socket(nbytes)' was implemented as
+        # 'socket.recv(nbytes, socket.MSG_WAITALL)'
+        # but socket.MSG_WAITALL proved not reliable
+        #
+
+        def _recv_socket(nbytes):
+            """read nbytes bytes from self.socket"""
+
+            #
+            # code below is written under the assumption that
+            # 'nbytes' is smallish so that the 'while len(buf) < nbytes' loop
+            # is entered rarerly
+            #
+            try:
+                buf = self.socket.recv(nbytes)
+            except IOError as err:
+                raise ConnError(*err.args)
+
+            if not buf:
+                raise ShortRead(0, nbytes)
+
+            while len(buf) < nbytes:
+                try:
+                    tmp = self.socket.recv(nbytes - len(buf))
+                except IOError as err:
+                    raise ConnError(*err.args)
+
+                if not tmp:
+                    if self.verbose:
+                        print('ee', repr(buf))
+                    raise ShortRead(len(buf), nbytes)
+
+                buf += tmp
+
+            assert len(buf) == nbytes, (buf, len(buf), nbytes)
+            return buf
+
+        data = _recv_socket(_FromServerHeader.header_size)
+        header = _FromServerHeader(data)
         if self.verbose:
             print('<-', repr(header))
 
@@ -411,7 +510,7 @@ class _OwnetConnection(object):
             raise MalformedHeader('huge payload, unwilling to read', header)
 
         if header.payload > 0:
-            payload = self._read_socket(header.payload)
+            payload = _recv_socket(header.payload)
             if self.verbose:
                 print('..', repr(payload))
             assert header.size <= header.payload
@@ -459,7 +558,10 @@ class _Proxy(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+    def _new_connection(self):
+        return _OwnetConnection(self._sockaddr, self._family, self.verbose)
+
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0, timeout=0):
         """ retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
         """
@@ -467,12 +569,9 @@ class _Proxy(object):
         flags |= self.flags
         assert not (flags & FLG_PERSISTENCE)
 
-        try:
-            with _OwnetConnection(
-                    self._sockaddr, self._family, self.verbose) as conn:
-                ret, _, data = conn.req(msgtype, payload, flags, size, offset)
-        except IOError as err:
-            raise ConnError(*err.args)
+        with self._new_connection() as conn:
+            ret, _, data = conn.req(
+                msgtype, payload, flags, size, offset, timeout)
 
         return ret, data
 
@@ -480,20 +579,23 @@ class _Proxy(object):
         """sends a NOP packet and waits response; returns None"""
 
         ret, data = self.sendmess(MSG_NOP, bytes())
-        if (ret, data) != (0, bytes()):
+        if data or ret > 0:
+            raise ProtocolError('invalid reply to ping message')
+        if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret])
 
-    def present(self, path):
+    def present(self, path, timeout=0):
         """returns True if there is an entity at path"""
 
-        ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path))
-        assert ret <= 0 and len(data) == 0
+        ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path),
+                                  timeout=timeout)
+        assert ret <= 0 and not data, (ret, data)
         if ret < 0:
             return False
         else:
             return True
 
-    def dir(self, path='/', slash=True, bus=False):
+    def dir(self, path='/', slash=True, bus=False, timeout=0):
         """list entities at path"""
 
         if slash:
@@ -505,7 +607,7 @@ class _Proxy(object):
         else:
             flags = self.flags & ~FLG_BUS_RET
 
-        ret, data = self.sendmess(msg, str2bytez(path), flags)
+        ret, data = self.sendmess(msg, str2bytez(path), flags, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         if data:
@@ -513,19 +615,19 @@ class _Proxy(object):
         else:
             return []
 
-    def read(self, path, size=MAX_PAYLOAD, offset=0):
+    def read(self, path, size=MAX_PAYLOAD, offset=0, timeout=0):
         """read data at path"""
 
         if size > MAX_PAYLOAD:
             raise ValueError("size cannot exceed %d" % MAX_PAYLOAD)
 
         ret, data = self.sendmess(MSG_READ, str2bytez(path),
-                                  size=size, offset=offset, )
+                                  size=size, offset=offset, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         return data
 
-    def write(self, path, data, offset=0):
+    def write(self, path, data, offset=0, timeout=0):
         """write data at path
 
         path is a string, data binary; it is responsability of the caller
@@ -536,9 +638,10 @@ class _Proxy(object):
         if not isinstance(data, (bytes, bytearray, )):
             raise TypeError("'data' argument must be binary")
 
-        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path)+data,
-                                   size=len(data), offset=offset)
-        assert len(rdata) == 0
+        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path) + data,
+                                   size=len(data), offset=offset,
+                                   timeout=timeout)
+        assert not rdata, (ret, rdata)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
 
@@ -558,7 +661,7 @@ class _PersistentProxy(_Proxy):
 
     def __enter__(self):
         if not self.conn:
-            self._open_connection()
+            self.conn = self._new_connection()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -567,15 +670,6 @@ class _PersistentProxy(_Proxy):
     def __del__(self):
         self.close_connection()
 
-    def _open_connection(self):
-        assert self.conn is None
-        try:
-            self.conn = _OwnetConnection(self._sockaddr,
-                                         self._family,
-                                         self.verbose)
-        except IOError as err:
-            raise ConnError(*err.args)
-
     def close_connection(self):
         if self.conn:
             self.conn.shutdown()
@@ -583,97 +677,29 @@ class _PersistentProxy(_Proxy):
         else:
             assert self.conn is None
 
-    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0):
+    def sendmess(self, msgtype, payload, flags=0, size=0, offset=0, timeout=0):
         """
         retcode, data = sendmess(msgtype, payload)
         send generic message and returns retcode, data
         """
 
-        # ensure that there is an open connection
-        if not self.conn:
-            self._open_connection()
-        assert self.conn is not None
+        # reuse last valid connection or create new
+        conn = self.conn or self._new_connection()
+        # invalidate last connection
+        self.conn = None
 
         flags |= self.flags
         assert (flags & FLG_PERSISTENCE)
-        try:
-            ret, rflags, data = self.conn.req(
-                msgtype, payload, flags, size, offset)
-        except IOError as err:
-            raise ConnError(*err.args)
-        # persistence not granted
-        if not (rflags & FLG_PERSISTENCE):
-            self.close_connection()
+        ret, rflags, data = conn.req(
+            msgtype, payload, flags, size, offset, timeout)
+        if rflags & FLG_PERSISTENCE:
+            # persistence granted, save connection object for reuse
+            self.conn = conn
+        else:
+            # discard connection object
+            conn.shutdown()
 
         return ret, data
-
-
-#
-# legacy classes, please use factory functions instead
-#
-
-class OwnetProxy(_Proxy):
-    """This class is for legacy support only, and will be deprecated.
-
-    Objects of this class define methods to query a given owserver
-    """
-
-    def __init__(self, host='localhost', port=4304, flags=0,
-                 verbose=False, ):
-        """return an owserver proxy object bound at (host, port); default is
-        (localhost, 4304).
-
-        'flags' are or-ed in the header of each query sent to owserver.
-        If verbose is True, details on each sent and received packet is
-        printed on stdout.
-        """
-
-        # this class will be deprecated in version 0.9.x
-        warnings.warn(DeprecationWarning(
-            "Please use {0}.proxy()".format(__name__)))
-
-        # save init args
-        self.flags = flags | FLG_OWNET
-        self.verbose = verbose
-
-        # default (empty) errcodes tuple
-        self.errmess = _errtuple()
-
-        #
-        # init logic:
-        # try to connect to the given owserver, send a MSG_NOP,
-        # and check answer
-        #
-
-        # resolve host name/port
-        try:
-            gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
-        except socket.gaierror as err:
-            raise ConnError(*err.args)
-
-        # gai is a list of tuples, search for the first working one
-        lasterr = None
-        for (self._family, _, _, _, self._sockaddr) in gai:
-            try:
-                self.ping()
-            except ConnError as err:
-                # not working, go over to next sockaddr
-                lasterr = err
-            else:
-                # ok, this is working, stop searching
-                break
-        else:
-            # no working (sockaddr, family) found: reraise last exception
-            assert isinstance(lasterr, ConnError)
-            raise lasterr
-
-        # fetch errcodes array from owserver
-        try:
-            self.errmess = _errtuple(
-                m for m in bytes2str(self.read(PTH_ERRCODES)).split(','))
-        except OwnetError:
-            # failed, leave the default empty errcodes defined above
-            pass
 
 
 #
@@ -688,40 +714,39 @@ def proxy(host='localhost', port=4304, flags=0, persistent=False,
 
     # resolve host name/port
     try:
-        gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        gai = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM,
+                                 socket.IPPROTO_TCP)
     except socket.gaierror as err:
         raise ConnError(*err.args)
 
-    # gai is a list of tuples, search for the first working one
-    lasterr = None
-    for (family, _, _, _, sockaddr) in gai:
+    # gai is a (non empty) list of tuples, search for the first working one
+    assert gai
+    for (family, _type, _proto, _, sockaddr) in gai:
+        assert _type is socket.SOCK_STREAM and _proto is socket.IPPROTO_TCP
+        owp = _Proxy(family, sockaddr, flags, verbose)
         try:
-            owp = _PersistentProxy(family, sockaddr, flags, verbose)
-            owp.__enter__()
+            # check if there is an owserver listening
+            owp.ping()
         except ConnError as err:
-            # not working, go over to next sockaddr
-            lasterr = err
+            # no connection, go over to next sockaddr
+            lasterr = err.args
+            continue
         else:
-            # ok, this is working, stop searching
+            # ok, live owserver found, stop searching
             break
     else:
-        # no working (sockaddr, family) found: reraise last exception
-        assert isinstance(lasterr, ConnError)
-        raise lasterr
+        # no server listening on (family, sockaddr) found:
+        raise ConnError(*lasterr)
 
-    with owp:
-        try:
-            # fixme: should this be only optional?
-            owp._init_errcodes()
-        except ConnError as err:
-            raise ProtocolError('Error while connecting to owserver: {}'
-                                .format(err))
-        except ProtocolError as err:
-            # pass ProtocolError unchanged
-            raise err
+    # init errno to errmessage mapping
+    # FIXME: should this be only optional?
+    owp._init_errcodes()
 
-    if not persistent:
-        owp = clone(owp, persistent=False)
+    if persistent:
+        owp = clone(owp, persistent=True)
+
+    # here we should have all connections closed
+    assert not isinstance(owp, _PersistentProxy) or owp.conn is None
 
     return owp
 

@@ -60,7 +60,7 @@ class Properties(object):
 
         if not isinstance(record, (bytes, bytearray, )):
             raise TypeError('record must be binary')
-        record = record.decode()
+        record = bytes2str(record)
         flds = record.split(',')
         if len(flds) < 7:
             raise ValueError('invalid record')
@@ -147,6 +147,7 @@ class Root(object):
 
     def _walk(self, root):
 
+        assert isinstance(root, str), repr(root)
         ents = [root]
         while ents:
             ent = ents.pop()
@@ -156,7 +157,7 @@ class Root(object):
                 yield ent, self.proxy.read(ent)
 
     def _getstructure(self, family):
-        assert isinstance(family, basestring)
+        assert isinstance(family, str), repr(family)
         if family not in self._structure:
             self._structure[family] = dict(
                 (i.split('/', 3)[-1], Properties(j))
@@ -183,7 +184,7 @@ class Root(object):
             pass
 
         try:
-            family = self.proxy.read(path + 'family').decode()
+            family = bytes2str(self.proxy.read(path + 'family'))
         except protocol.OwnetError:
             raise ValueError('{0} does not appear to be a sensor'.format(path))
 

@@ -2,7 +2,7 @@ pyownet: Python OWFS client library (owserver protocol)
 =======================================================
 
 .. image:: https://readthedocs.org/projects/pyownet/badge/?version=latest&style=flat
-   :target: http://pyownet.readthedocs.org/en/latest/
+   :target: http://pyownet.readthedocs.io/en/latest/
    :alt: Package Documentation
 
 .. image:: https://img.shields.io/pypi/v/pyownet.svg
@@ -38,14 +38,14 @@ The code base is written in Python 2, but Python 3 is fully supported,
 and is the main developing language. Running the ``2to3`` tool will
 generate valid and, whenever possible, idiomatic Python 3 code.
 
-Explicitly supported versions are Python 2.6, 2.7, 3.2 through 3.5.
+Explicitly supported versions are Python 2.6, 2.7, 3.3 through 3.5.
 
 
 Documentation
 -------------
 
 Full package documentation is available at
-http://pyownet.readthedocs.org/en/latest/
+http://pyownet.readthedocs.io/en/latest/
 
 
 .. _owserver: http://owfs.org/index.php?page=owserver_protocol
