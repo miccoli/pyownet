@@ -83,6 +83,10 @@ def main():
         tempg.add_argument('-b', '--binary', action='store_true',
                            help='output binary data')
 
+        # debug output
+        parser.add_argument('-d', '--debug', action='store_true',
+                           help='debug output')
+
         return parser
 
     def print_data(data):
@@ -135,7 +139,8 @@ def main():
     #
     try:
         owproxy = protocol.proxy(
-            host, port, flags=args.t_flags | fcodes[args.format], )
+            host, port, flags=args.t_flags | fcodes[args.format],
+            verbose=args.debug, )
     except protocol.ConnError as error:
         print("Unable to open connection to '{0}:{1}'\nSystem error: {2}"
               .format(host, port, error), file=sys.stderr)
