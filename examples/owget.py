@@ -85,7 +85,7 @@ def main():
 
         # debug output
         parser.add_argument('-d', '--debug', action='store_true',
-                           help='debug output')
+                            help='debug output')
 
         return parser
 

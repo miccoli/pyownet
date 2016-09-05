@@ -15,3 +15,8 @@ hardcoded
 designator
 builtin
 keepalive
+pyownet
+Wikipedia
+ftp
+java
+fallback
