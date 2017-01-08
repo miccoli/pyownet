@@ -4,6 +4,7 @@ Changelog
 v0.10.1 (devel)
 ---------------
 
+- official support for Python 3.6 in ``tox.ini`` and ``setup.py``
 - Python2 uses ``str`` instead of ``unicode`` for pathnames.
   (E.g. the return of ``proxy().dir()``)
 - Support for Python 3.2 dropped (no more unit testing.)
