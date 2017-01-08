@@ -160,5 +160,6 @@ class Test_misc(unittest.TestCase):
         else:
             self.skipTest('unable to create a persistent connection')
 
+
 if __name__ == '__main__':
     unittest.main()

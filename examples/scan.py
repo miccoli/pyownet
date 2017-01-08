@@ -48,5 +48,6 @@ def main():
                 temp = ''
             print('{0:<17} {1:<7} {2:>7}'.format(sensor, stype, temp))
 
+
 if __name__ == '__main__':
     main()

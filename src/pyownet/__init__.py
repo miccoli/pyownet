@@ -24,6 +24,7 @@ __version__ = '0.10.1.dev1'
 class Error(Exception):
     """Base class for all package errors"""
 
+
 # map legacy classes to protocol module
 from . import (protocol, legacy)
 protocol.OwnetProxy = legacy.OwnetProxy

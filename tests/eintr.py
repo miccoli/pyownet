@@ -61,5 +61,6 @@ def main():
     elt = time.time() - tic
     print('{:d} errors / {:d} calls in {:.1f}s'.format(inter, count, elt))
 
+
 if __name__ == '__main__':
     main()

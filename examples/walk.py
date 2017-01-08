@@ -123,5 +123,6 @@ def main():
     with proxy:
         walk(urlc.path)
 
+
 if __name__ == '__main__':
     main()
