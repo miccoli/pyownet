@@ -1,9 +1,9 @@
 Introduction
 ============
 
-pyownet is a pure Python package for interfacing to a 1-Wire
-network via OWFS. A brief introduction to the main components with
-which pyownet interacts is given below.
+*pyownet* is a pure Python client library for accessing a 1-Wire
+network using an OWFS owserver. A brief introduction to the main
+components with which pyownet interacts is given below.
 
 1-Wire
 ------
@@ -12,7 +12,7 @@ which pyownet interacts is given below.
 Integrated™. A typical 1-Wire network is composed by a master device
 and a collection of slave devices/sensors. The master device is
 usually connected to a host computer via a serial or USB interface,
-but there exist also ethernet or other network adapters.
+but also embedded or bus bridging solutions are possible.
 
 .. seealso::
 
@@ -120,7 +120,7 @@ stream of bytes (of length ``server_msg.payload`` or
 To time :py:mod:`pyownet` comprises a single module
 :py:mod:`pyownet.protocol`, which is a low-level implementation of the
 client side of the owserver protocol. It can be considered a
-replacement of the official OWFS module :py:mod:`ownet.connection` (to
+replacement of the OWFS module :py:mod:`ownet.connection` (to
 be found in `module/ownet/python`_).
 
 .. _module/ownet/python:

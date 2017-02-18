@@ -4,9 +4,8 @@ pyownet documentation
 
 .. topic:: Abstract
 
-   pyownet is a pure python package for interfacing with OWFS via the
-   *owserver network protocol*. OWFS is a software system to access
-   devices on a 1-Wire® network.
+   *pyownet* is a pure Python client library for accessing a 1-Wire®
+   network by means of OWFS and the *owserver network protocol*.
 
 Contents
 ========
