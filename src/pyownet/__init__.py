@@ -1,7 +1,7 @@
 """python owserver client"""
 
 #
-# Copyright 2013-2016 Stefano Miccoli
+# Copyright 2013-2017 Stefano Miccoli
 #
 # This python package is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #
 
 __all__ = ['__version__', 'Error']
-__version__ = '0.10.1.dev1'
+__version__ = '0.11.0.dev1'
 
 
 class Error(Exception):

@@ -13,6 +13,7 @@ with open('../src/pyownet/__init__.py') as infile:
         version_match = regex.match(line)
         if version_match:
             __version__ = version_match.group('ver')
+            __majmin__ = '.'.join(__version__.split('.')[:2])
             break
     else:
         raise RuntimeError("Unable to find version string.")
@@ -35,10 +36,10 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pyownet'
-copyright = u'2014–2016, Stefano Miccoli'
+copyright = u'2014–2017, Stefano Miccoli'
 
 # The short X.Y version.
-version = '0.10'
+version = __majmin__
 # The full version, including alpha/beta/rc tags.
 release = __version__
 
