@@ -7,7 +7,6 @@ if sys.version_info < (2, 7, ):
     import unittest2 as unittest
 else:
     import unittest
-import warnings
 
 from pyownet import protocol
 from . import (HOST, PORT, FAKEHOST, FAKEPORT)
@@ -59,19 +58,6 @@ class _TestProxyMix(object):
             self.assertIsNone(owp.conn)
         except AttributeError:
             pass
-
-
-class TestOwnetProxy(_TestProxyMix, unittest.TestCase, ):
-
-    @classmethod
-    def setUpClass(cls):
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', DeprecationWarning)
-                cls.proxy = protocol.OwnetProxy(HOST, PORT)
-        except protocol.ConnError as exc:
-            raise unittest.SkipTest('no owserver on %s:%s, got:%s' %
-                                    (HOST, PORT, exc))
 
 
 class Test_Proxy(_TestProxyMix, unittest.TestCase, ):
@@ -133,10 +119,6 @@ class Test_clone_TF(Test_PersistentProxy):
 class Test_misc(unittest.TestCase):
 
     def test_exceptions(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore', DeprecationWarning)
-            self.assertRaises(protocol.ConnError, protocol.OwnetProxy,
-                              host='nonexistent.fake')
         self.assertRaises(protocol.ConnError, protocol.proxy,
                           host='nonexistent.fake')
         self.assertRaises(protocol.ConnError, protocol.proxy,

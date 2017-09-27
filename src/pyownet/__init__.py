@@ -18,13 +18,8 @@
 #
 
 __all__ = ['__version__', 'Error']
-__version__ = '0.11.0.dev1'
+__version__ = '0.11.0.dev2'
 
 
 class Error(Exception):
     """Base class for all package errors"""
-
-
-# map legacy classes to protocol module
-from . import (protocol, legacy)
-protocol.OwnetProxy = legacy.OwnetProxy
