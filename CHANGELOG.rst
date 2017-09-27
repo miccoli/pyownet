@@ -2,7 +2,7 @@ Changelog
 =========
 
 v0.11.0 (devel)
----------------------------
+---------------
 
 - official support for Python 3.6 in ``tox.ini`` and ``setup.py``
 - Python2 uses ``str`` instead of ``unicode`` for pathnames.

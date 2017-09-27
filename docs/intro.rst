@@ -51,6 +51,8 @@ in the OWFS source tree under the `module/ownet`_ directory.
        official OWFS site
 
 
+.. _owproto:
+
 owserver protocol brief
 .......................
 

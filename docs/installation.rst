@@ -11,17 +11,19 @@ PyPI: https://pypi.python.org/pypi/pyownet .
 Python version support
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The code base is written in Python 2, but Python 3 is fully supported,
-and is the main developing language. Running the ``2to3`` tool will
-generate valid and, whenever possible, idiomatic Python 3 code. The
-present documentation refers to the Python 3 version of the package.
+The code base is written in Python 2, but Python 3 is fully supported:
+running the 2to3_ tool will generate valid and, whenever possible,
+idiomatic Python 3 code. The Python 2 version should be considered
+legacy: the present documentation refers only to the Python 3 version.
+
+.. _2to3: https://docs.python.org/3/library/2to3.html#to3-automated-python-2-to-3-code-translation
 
 Explicitly supported versions are Python 2.6, 2.7, 3.3 through 3.6.
 
 Install from PyPI
 -----------------
 
-The preferred installation method is from `PyPI`_ via `pip`_: ::
+The preferred installation method is from PyPI_ via pip_: ::
 
   pip install pyownet
 
@@ -29,14 +31,14 @@ This will install the :py:mod:`pyownet` package in the default
 location.
 
 If you are also interested in usage examples and tests you can
-download the source package from the PyPI `downloads`_, unpack it, and
+download the source package from the PyPI downloads_, unpack it, and
 install::
 
   python setup.py install
 
 In the source tree there will be ``example`` and ``test`` directories.
 
-.. _PyPI: https://pypi.python.org/pypi/
+.. _PyPI: https://pypi.python.org/pypi/pyownet
 .. _pip: https://pip.pypa.io/en/stable/user_guide/#installing-packages
 .. _downloads: https://pypi.python.org/pypi/pyownet#downloads
 

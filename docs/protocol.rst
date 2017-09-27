@@ -285,7 +285,7 @@ functions.
 
    .. py:method:: sendmess(msgtype, payload, flags=0, size=0, offset=0, timeout=0)
 
-      Send message to owserver.
+      Send message to owserver, and blocking waits for reply.
 
       :param int msgtype: message type code
       :param bytes payload: message payload
