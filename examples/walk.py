@@ -108,9 +108,9 @@ def main():
 
     def walk(path):
         try:
-            if not path.endswith('/'):
+            if not path.decode().endswith('/'):
                 val = proxy.read(path)
-                print("{:40} {!r}".format(path, val))
+                print("{:40} {}".format(path.decode(), val))
             else:
                 for entity in proxy.dir(path, bus=args.bus):
                     walk(entity)
@@ -121,7 +121,7 @@ def main():
             print('Unable to walk {}: {}'.format(path, error), file=sys.stderr)
 
     with proxy:
-        walk(urlc.path)
+        walk(urlc.path.encode())
 
 
 if __name__ == '__main__':

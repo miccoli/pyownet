@@ -30,22 +30,22 @@ class _TestProxyMix(object):
         self.assertIsNone(self.proxy.ping())
 
     def test_present(self):
-        self.assertTrue(self.proxy.present('/'))
-        self.assertFalse(self.proxy.present('/nonexistent'))
+        self.assertTrue(self.proxy.present(b'/'))
+        self.assertFalse(self.proxy.present(b'/nonexistent'))
 
     def test_dir_read(self):
         for i in self.proxy.dir(bus=False):
             self.assertTrue(self.proxy.present(i))
-            self.assertTrue(self.proxy.present(i + 'type'))
-            self.proxy.read(i + 'type')
-            if self.proxy.present(i + 'temperature'):
-                self.proxy.read(i + 'temperature')
+            self.assertTrue(self.proxy.present(i + b'type'))
+            self.proxy.read(i + b'type')
+            if self.proxy.present(i + b'temperature'):
+                self.proxy.read(i + b'temperature')
 
     def test_exceptions(self):
-        self.assertRaises(protocol.OwnetError, self.proxy.dir, '/nonexistent')
-        self.assertRaises(protocol.OwnetError, self.proxy.read, '/')
+        self.assertRaises(protocol.OwnetError, self.proxy.dir, b'/nonexistent')
+        self.assertRaises(protocol.OwnetError, self.proxy.read, b'/')
         self.assertRaises(TypeError, self.proxy.dir, 1)
-        self.assertRaises(TypeError, self.proxy.write, '/', 1)
+        self.assertRaises(TypeError, self.proxy.write, b'/', 1)
         self.assertRaises(TypeError, self.proxy.write, 1, b'abc')
 
     def test_context(self):

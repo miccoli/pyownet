@@ -111,9 +111,9 @@ MSK_DEVFORMAT = 0xFF000000
 # useful owfs paths
 #
 
-PTH_ERRCODES = '/settings/return_codes/text.ALL'
-PTH_VERSION = '/system/configuration/version'
-PTH_PID = '/system/process/pid'
+PTH_ERRCODES = b'/settings/return_codes/text.ALL'
+PTH_VERSION = b'/system/configuration/version'
+PTH_PID = b'/system/process/pid'
 
 #
 # implementation specific constants
@@ -144,14 +144,6 @@ else:
     # python3 semantic
     _b2s = lambda x: x.decode('ascii')
     _s2b = lambda x: x.encode('ascii')
-
-
-def str2bytez(s):
-    """Transform string to zero-terminated bytes."""
-
-    if not isinstance(s, str):
-        raise TypeError()
-    return _s2b(s) + b'\x00'
 
 
 def bytes2str(b):
@@ -586,17 +578,18 @@ class _Proxy(object):
     def present(self, path, timeout=0):
         """returns True if there is an entity at path"""
 
-        ret, data = self.sendmess(MSG_PRESENCE, str2bytez(path),
-                                  timeout=timeout)
+        ret, data = self.sendmess(MSG_PRESENCE, path, timeout=timeout)
         assert ret <= 0 and not data, (ret, data)
         if ret < 0:
             return False
         else:
             return True
 
-    def dir(self, path='/', slash=True, bus=False, timeout=0):
+    def dir(self, path=b'/', slash=True, bus=False, timeout=0):
         """list entities at path"""
 
+        if not isinstance(path, (bytes, bytearray, )):
+            raise TypeError('path must be bytes')
         if slash:
             msg = MSG_DIRALLSLASH
         else:
@@ -606,21 +599,23 @@ class _Proxy(object):
         else:
             flags = self.flags & ~FLG_BUS_RET
 
-        ret, data = self.sendmess(msg, str2bytez(path), flags, timeout=timeout)
+        ret, data = self.sendmess(msg, path, flags, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
         if data:
-            return bytes2str(data).split(',')
+            return data.split(b',')
         else:
             return []
 
     def read(self, path, size=MAX_PAYLOAD, offset=0, timeout=0):
         """read data at path"""
 
+        if not isinstance(path, (bytes, bytearray, )):
+            raise TypeError('path must be bytes')
         if size > MAX_PAYLOAD:
             raise ValueError("size cannot exceed %d" % MAX_PAYLOAD)
 
-        ret, data = self.sendmess(MSG_READ, str2bytez(path),
+        ret, data = self.sendmess(MSG_READ, path,
                                   size=size, offset=offset, timeout=timeout)
         if ret < 0:
             raise OwnetError(-ret, self.errmess[-ret], path)
@@ -629,15 +624,16 @@ class _Proxy(object):
     def write(self, path, data, offset=0, timeout=0):
         """write data at path
 
-        path is a string, data binary; it is responsability of the caller
+        path and data are binary; it is responsability of the caller
         ensure proper encoding.
         """
 
-        # fixme: check of path type delayed to str2bytez
+        if not isinstance(path, (bytes, bytearray, )):
+            raise TypeError('path must be bytes')
         if not isinstance(data, (bytes, bytearray, )):
             raise TypeError("'data' argument must be binary")
 
-        ret, rdata = self.sendmess(MSG_WRITE, str2bytez(path) + data,
+        ret, rdata = self.sendmess(MSG_WRITE, path + b'\x00' + data,
                                    size=len(data), offset=offset,
                                    timeout=timeout)
         assert not rdata, (ret, rdata)

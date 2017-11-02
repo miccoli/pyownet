@@ -4,6 +4,7 @@ Changelog
 v0.11.0 (devel)
 ---------------
 
+- fully binary Python3 API (experimental)
 - legacy ``OwnetProxy`` class deleted
 - official support for Python 3.6 in ``tox.ini`` and ``setup.py``
 - Python2 uses ``str`` instead of ``unicode`` for pathnames.

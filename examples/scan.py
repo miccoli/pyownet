@@ -33,20 +33,21 @@ def main():
         pid = None
         ver = None
         try:
-            pid = int(proxy.read('/system/process/pid'))
-            ver = proxy.read('/system/configuration/version').decode()
+            pid = int(proxy.read(protocol.PTH_PID))
+            ver = proxy.read(protocol.PTH_VERSION).decode()
         except protocol.OwnetError:
             pass
         print('{0}, pid = {1:d}, ver = {2}'.format(proxy, pid, ver))
         print('{0:^17} {1:^7} {2:>7}'.format('id', 'type', 'temp.'))
         for sensor in proxy.dir(slash=False, bus=False):
-            stype = proxy.read(sensor + '/type').decode()
+            stype = proxy.read(sensor + b'/type')
             try:
-                temp = float(proxy.read(sensor + '/temperature'))
+                temp = float(proxy.read(sensor + b'/temperature'))
                 temp = "{0:.2f}".format(temp)
             except protocol.OwnetError:
                 temp = ''
-            print('{0:<17} {1:<7} {2:>7}'.format(sensor, stype, temp))
+            print('{0:<17} {1:<7} {2:>7}'.format(sensor.decode(),
+                                                 stype.decode(), temp))
 
 
 if __name__ == '__main__':

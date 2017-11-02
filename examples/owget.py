@@ -155,10 +155,10 @@ def main():
     #
     try:
         if urlc.path.endswith('/'):
-            for path in owproxy.dir(urlc.path, bus=True):
-                print(path)
+            for path in owproxy.dir(urlc.path.encode(), bus=True):
+                print(path.decode())
         else:
-            data = owproxy.read(urlc.path)
+            data = owproxy.read(urlc.path.encode())
             print_data(data)
     except protocol.OwnetError as error:
         print("Remote server error: {2}"
