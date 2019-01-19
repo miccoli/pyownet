@@ -18,7 +18,7 @@ legacy: the present documentation refers only to the Python 3 version.
 
 .. _2to3: https://docs.python.org/3/library/2to3.html#to3-automated-python-2-to-3-code-translation
 
-Explicitly supported versions are Python 2.6, 2.7, 3.3 through 3.6.
+Explicitly supported versions are Python 2.7, 3.3 through 3.7.
 
 Install from PyPI
 -----------------

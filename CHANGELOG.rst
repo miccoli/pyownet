@@ -10,6 +10,11 @@ v0.11.0 (devel)
   (E.g. the return of ``proxy().dir()``)
 - Support for Python 3.2 dropped (no more unit testing.)
 
+v0.10.0.post1 (2019-01-19)
+--------------------------
+
+v0.10.0 re-licensed under LGPL v3
+
 v0.10.0 (2016-03-30)
 --------------------
 

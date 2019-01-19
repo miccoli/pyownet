@@ -38,7 +38,7 @@ The code base is written in Python 2, but Python 3 is fully supported,
 and is the main developing language. Running the ``2to3`` tool will
 generate valid and, whenever possible, idiomatic Python 3 code.
 
-Explicitly supported versions are Python 2.6, 2.7, 3.3 through 3.6.
+Explicitly supported versions are Python 2.7, 3.3 through 3.7.
 
 
 Documentation
